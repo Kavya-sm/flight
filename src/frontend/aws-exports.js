@@ -13,7 +13,7 @@ const awsmobile = {
     "responseType": "code"
   },
   // FIX THESE LINES:
-  "aws_cognito_username_attributes": ["PREFERRED_USERNAME"],  // ← CHANGE THIS
+  "aws_cognito_username_attributes": [],  // ← CHANGE THIS
   "aws_cognito_signup_attributes": ["EMAIL", "PREFERRED_USERNAME", "PHONE_NUMBER", "GIVEN_NAME", "FAMILY_NAME"],  // ← ADD ALL REQUIRED ATTRIBUTES
   "aws_cognito_mfa_configuration": "OFF",
   "aws_cognito_verification_mechanisms": ["EMAIL"]
