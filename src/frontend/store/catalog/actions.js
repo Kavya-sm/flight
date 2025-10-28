@@ -1,7 +1,6 @@
 import Flight from "../../shared/models/FlightClass";
 
 /**
- *
  * Catalog [Vuex Module Action](https://vuex.vuejs.org/guide/actions.html) - fetchFlights retrieves all flights for a given date, departure and arrival from Catalog service.
  *
  * It uses SET_FLIGHTS mutation to update Catalog state with the latest flights.
@@ -30,42 +29,39 @@ import Flight from "../../shared/models/FlightClass";
  *    this.filteredFlights = this.sortByDeparture(this.flights);
  * }
  */
-export async function fetchFlights(
-  { commit },
-  { date, departure, arrival, paginationToken = "" }
-) {
+export async function fetchFlights({ commit }, { departure, arrival }) {
   console.group("store/catalog/actions/fetchFlights");
   commit("SET_LOADER", true);
 
   try {
     console.log("Fetching flight data via REST API");
-    
-    // Use your REST API Gateway instead of GraphQL
+
     const response = await fetch(
       `https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/search?from=${departure}&to=${arrival}`
     );
-    
+
     const data = await response.json();
     const flightsData = JSON.parse(data.body);
 
-    // Convert your API response to Flight objects
-    const flights = flightsData.map(flightData => new Flight({
-      id: flightData.id,
-      departureDate: flightData.departure,
-      departureAirportCode: flightData.from,
-      departureAirportName: flightData.from,
-      arrivalDate: flightData.arrival,
-      arrivalAirportCode: flightData.to,
-      arrivalAirportName: flightData.to,
-      ticketPrice: flightData.price,
-      ticketCurrency: 'EUR',
-      flightNumber: flightData.id,
-      seatCapacity: flightData.seats || 100
-    }));
+    const flights = flightsData.map(flightData =>
+      new Flight({
+        id: flightData.id,
+        departureDate: flightData.departure,
+        departureAirportCode: flightData.from,
+        departureAirportName: flightData.from,
+        arrivalDate: flightData.arrival,
+        arrivalAirportCode: flightData.to,
+        arrivalAirportName: flightData.to,
+        ticketPrice: flightData.price,
+        ticketCurrency: "EUR",
+        flightNumber: flightData.id,
+        seatCapacity: flightData.seats || 100
+      })
+    );
 
     console.log(flights);
     commit("SET_FLIGHTS", flights);
-    commit("SET_FLIGHT_PAGINATION", null); // No pagination in REST API
+    commit("SET_FLIGHT_PAGINATION", null);
     commit("SET_LOADER", false);
     console.groupEnd();
   } catch (error) {
@@ -76,7 +72,6 @@ export async function fetchFlights(
 }
 
 /**
- *
  * Catalog [Vuex Module Action](https://vuex.vuejs.org/guide/actions.html) - fetchByFlightId retrieves a unique flight from Catalog service. Flight Number may be reused but not ID.
  *
  * Similarly to fetchFlights, it also controls Flight Loader when fetching data from Catalog service.
@@ -103,22 +98,20 @@ export async function fetchByFlightId({ commit }, { flightId }) {
   try {
     console.group("store/catalog/actions/fetchByFlightId");
     commit("SET_LOADER", true);
-    
-    // Use REST API to get specific flight
+
     const response = await fetch(
-      `https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/search`
+      "https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/search"
     );
-    
+
     const data = await response.json();
     const flightsData = JSON.parse(data.body);
-    
-    // Find the specific flight by ID
+
     const flightData = flightsData.find(flight => flight.id === flightId);
-    
+
     if (!flightData) {
       throw new Error(`Flight with ID ${flightId} not found`);
     }
-    
+
     const flight = new Flight({
       id: flightData.id,
       departureDate: flightData.departure,
@@ -128,11 +121,11 @@ export async function fetchByFlightId({ commit }, { flightId }) {
       arrivalAirportCode: flightData.to,
       arrivalAirportName: flightData.to,
       ticketPrice: flightData.price,
-      ticketCurrency: 'EUR',
+      ticketCurrency: "EUR",
       flightNumber: flightData.id,
       seatCapacity: flightData.seats || 100
     });
-    
+
     console.log(flight);
     commit("SET_LOADER", false);
     console.groupEnd();
