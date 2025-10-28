@@ -1,6 +1,4 @@
 import Flight from "../../shared/models/FlightClass";
-import { API, graphqlOperation } from "aws-amplify";
-import { getFlightBySchedule, getFlight } from "./graphql";
 
 /**
  *
@@ -39,39 +37,35 @@ export async function fetchFlights(
   console.group("store/catalog/actions/fetchFlights");
   commit("SET_LOADER", true);
 
-  var nextToken = paginationToken || null;
-
   try {
-    const flightOpts = {
-      departureAirportCode: departure,
-      arrivalAirportCodeDepartureDate: {
-        beginsWith: {
-          arrivalAirportCode: arrival,
-          departureDate: date
-        }
-      },
-      filter: { seatCapacity: { gt: 0 } },
-      limit: 5,
-      nextToken: nextToken
-    };
+    console.log("Fetching flight data via REST API");
+    
+    // Use your REST API Gateway instead of GraphQL
+    const response = await fetch(
+      `https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/search?from=${departure}&to=${arrival}`
+    );
+    
+    const data = await response.json();
+    const flightsData = JSON.parse(data.body);
 
-    console.log("Fetching flight data");
-    console.log(flightOpts);
-    const {
-      // @ts-ignore
-      data: {
-        getFlightBySchedule: { items: flightData, nextToken: paginationToken }
-      }
-    } = await API.graphql(graphqlOperation(getFlightBySchedule, flightOpts));
-
-    // data mutations happen within a Flight class
-    // here we convert graphQL results into an array of Flights
-    // before comitting to Vuex State Management
-    const flights = flightData.map(flight => new Flight(flight));
+    // Convert your API response to Flight objects
+    const flights = flightsData.map(flightData => new Flight({
+      id: flightData.id,
+      departureDate: flightData.departure,
+      departureAirportCode: flightData.from,
+      departureAirportName: flightData.from,
+      arrivalDate: flightData.arrival,
+      arrivalAirportCode: flightData.to,
+      arrivalAirportName: flightData.to,
+      ticketPrice: flightData.price,
+      ticketCurrency: 'EUR',
+      flightNumber: flightData.id,
+      seatCapacity: flightData.seats || 100
+    }));
 
     console.log(flights);
     commit("SET_FLIGHTS", flights);
-    commit("SET_FLIGHT_PAGINATION", paginationToken);
+    commit("SET_FLIGHT_PAGINATION", null); // No pagination in REST API
     commit("SET_LOADER", false);
     console.groupEnd();
   } catch (error) {
@@ -109,12 +103,36 @@ export async function fetchByFlightId({ commit }, { flightId }) {
   try {
     console.group("store/catalog/actions/fetchByFlightId");
     commit("SET_LOADER", true);
-    const {
-      // @ts-ignore
-      data: { getFlight: flightData }
-    } = await API.graphql(graphqlOperation(getFlight, { id: flightId }));
-
-    const flight = new Flight(flightData);
+    
+    // Use REST API to get specific flight
+    const response = await fetch(
+      `https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/search`
+    );
+    
+    const data = await response.json();
+    const flightsData = JSON.parse(data.body);
+    
+    // Find the specific flight by ID
+    const flightData = flightsData.find(flight => flight.id === flightId);
+    
+    if (!flightData) {
+      throw new Error(`Flight with ID ${flightId} not found`);
+    }
+    
+    const flight = new Flight({
+      id: flightData.id,
+      departureDate: flightData.departure,
+      departureAirportCode: flightData.from,
+      departureAirportName: flightData.from,
+      arrivalDate: flightData.arrival,
+      arrivalAirportCode: flightData.to,
+      arrivalAirportName: flightData.to,
+      ticketPrice: flightData.price,
+      ticketCurrency: 'EUR',
+      flightNumber: flightData.id,
+      seatCapacity: flightData.seats || 100
+    });
+    
     console.log(flight);
     commit("SET_LOADER", false);
     console.groupEnd();
