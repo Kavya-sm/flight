@@ -16,6 +16,28 @@ export const SET_BOOKINGS = (state, bookings) => {
   }
 };
 
+/**
+ * Append bookings for pagination
+ */
+export const APPEND_BOOKINGS = (state, bookings) => {
+  state.bookings = [...state.bookings, ...bookings];
+};
+
 export const SET_BOOKING_PAGINATION = (state, paginationToken) => {
   state.paginationToken = paginationToken;
+};
+
+/**
+ * Add a single booking to the state
+ */
+export const ADD_BOOKING = (state, booking) => {
+  state.bookings.unshift(booking);
+};
+
+/**
+ * Set loyalty points
+ */
+export const SET_LOYALTY_POINTS = (state, loyaltyData) => {
+  state.loyaltyPoints = loyaltyData.points;
+  state.loyaltyTier = loyaltyData.tier;
 };
