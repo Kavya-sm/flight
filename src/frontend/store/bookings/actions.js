@@ -4,12 +4,6 @@ import Flight from "../../shared/models/FlightClass"; // eslint-disable-line
 import { Loading } from "quasar";
 import { processPayment } from "./payment";
 
-import { API, graphqlOperation } from "aws-amplify";
-import {
-  processBooking as processBookingMutation,
-  getBookingByStatus
-} from "./graphql";
-
 /**
  *
  * Booking [Vuex Module Action](https://vuex.vuejs.org/guide/actions.html) - fetchBooking retrieves all bookings for current authenticated customer.
@@ -19,24 +13,9 @@ import {
  * @param {string} paginationToken - pagination token for loading additional bookings
  * @returns {promise} - Promise representing whether bookings from Booking service have been updated in the store
  * @see {@link SET_BOOKINGS} for more info on mutation
- * @example
- * // exerpt from src/views/Bookings.vue
- * import { mapState, mapGetters } from "vuex";
- * ...
- * async mounted() {
- *    if (this.isAuthenticated) {
- *       await this.$store.dispatch("bookings/fetchBooking");
- *    }
- * },
- * computed: {
- *    ...mapState({
- *        bookings: state => state.bookings.bookings
- *    }),
- *    ...mapGetters("profile", ["isAuthenticated"])
- * }
  */
 export async function fetchBooking(
-  { commit, rootGetters },
+  { commit, rootState, rootGetters },
   paginationToken = ""
 ) {
   console.group("store/bookings/actions/fetchBooking");
@@ -44,37 +23,69 @@ export async function fetchBooking(
     message: "Loading bookings..."
   });
 
-  var nextToken = paginationToken || null;
-
   try {
-    const customerId = rootGetters["profile/userAttributes"].sub;
-    const bookingFilter = {
-      customer: customerId,
-      status: {
-        eq: "CONFIRMED"
-      },
-      limit: 3,
-      nextToken: nextToken
-    };
+    const userId = rootState.profile.user?.id || rootGetters["profile/userAttributes"]?.sub;
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
 
-    console.log("Fetching booking data");
-    console.log(bookingFilter);
-    const {
-      // @ts-ignore
-      data: {
-        getBookingByStatus: { items: bookingData, nextToken: paginationToken }
-      }
-    } = await API.graphql(graphqlOperation(getBookingByStatus, bookingFilter));
+    let url = `${process.env.VUE_APP_API_URL}/bookings?userId=${userId}`;
+    if (paginationToken) {
+      url += `&paginationToken=${paginationToken}`;
+    }
 
-    let bookings = bookingData.map(booking => new Booking(booking));
+    console.log("Fetching booking data from:", url);
+    const response = await fetch(url);
+    const data = await response.json();
 
-    console.log(bookings);
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to fetch bookings');
+    }
 
-    commit("SET_BOOKINGS", bookings);
-    commit("SET_BOOKING_PAGINATION", paginationToken);
+    // Transform the API response to match your existing Booking class structure
+    const bookings = data.bookings.map(booking => {
+      // Create a booking object that matches your existing structure
+      const bookingData = {
+        id: booking.bookingId,
+        bookingReference: booking.bookingId,
+        status: booking.status?.toUpperCase() || 'CONFIRMED',
+        customer: booking.userId,
+        createdAt: booking.createdAt,
+        outboundFlight: {
+          id: booking.flightId,
+          departureDate: booking.flightDetails.departure,
+          departureAirportCode: booking.flightDetails.from,
+          departureAirportName: `Airport ${booking.flightDetails.from}`,
+          departureCity: booking.flightDetails.from,
+          arrivalDate: booking.flightDetails.arrival,
+          arrivalAirportCode: booking.flightDetails.to,
+          arrivalAirportName: `Airport ${booking.flightDetails.to}`,
+          arrivalCity: booking.flightDetails.to,
+          ticketPrice: booking.totalPrice,
+          ticketCurrency: 'USD',
+          flightNumber: booking.flightDetails.flightNumber || 'Unknown',
+          airline: booking.flightDetails.airline,
+          seatCapacity: booking.flightDetails.seats || 180
+        },
+        checkedIn: false,
+        paymentToken: 'mock_payment_token' // Since we're using mock payments
+      };
+      
+      return new Booking(bookingData);
+    });
+
+    console.log("Transformed bookings:", bookings);
+
+    if (paginationToken) {
+      commit("APPEND_BOOKINGS", bookings);
+    } else {
+      commit("SET_BOOKINGS", bookings);
+    }
+    commit("SET_BOOKING_PAGINATION", data.paginationToken);
 
     Loading.hide();
     console.groupEnd();
+    return bookings;
   } catch (err) {
     Loading.hide();
     console.error(err);
@@ -92,75 +103,100 @@ export async function fetchBooking(
  * @param {object} obj.paymentToken - Stripe JS Payment token object
  * @param {Flight} obj.outboundFlight - Outbound Flight
  * @returns {promise} - Promise representing booking effectively made in the Booking service.
- * @example
- * // exerpt from src/views/FlightSelection.vue
- * methods: {
- *    async payment() {
- *        let options = {
- *           name: this.form.name,
- *           address_zip: this.form.postcode,
- *           address_country: this.form.country
- *        }
- *
- *        try {
- *            const { token, error } = await stripe.createToken(card, options);
- *            this.token.details = token;
- *            this.token.error = error;
- *
- *            if (this.token.error) throw this.token.error;
- *
- *            await this.$store.dispatch("bookings/createBooking", {
- *              paymentToken: this.token,
- *              outboundFlight: this.selectedFlight
- *            });
- *        ...
- *        }
  */
 export async function createBooking(
-  { rootState },
+  { commit, rootState },
   { paymentToken, outboundFlight }
 ) {
   console.group("store/bookings/actions/createBooking");
   try {
-    const customerEmail = rootState.profile.user.attributes.email;
+    const userId = rootState.profile.user?.id;
+    const customerEmail = rootState.profile.user?.attributes?.email || rootState.profile.user?.email;
 
-    console.info(
-      `Processing payment before proceeding to book flight ${outboundFlight}`
-    );
-    let chargeToken = await processPayment({
-      paymentToken,
-      outboundFlight,
-      customerEmail
-    });
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
 
-    console.info(
-      `Creating booking with token ${chargeToken} for flight ${outboundFlight}`
-    );
+    console.info(`Processing booking for flight ${outboundFlight.id}`);
 
     Loading.show({
       message: "Creating a new booking..."
     });
 
-    const processBookingInput = {
-      input: {
-        paymentToken: chargeToken,
-        bookingOutboundFlightId: outboundFlight.id
+    // Prepare booking data for REST API
+    const bookingData = {
+      userId: userId,
+      flightId: outboundFlight.id,
+      passengers: [
+        {
+          firstName: rootState.profile.user?.firstName || 'Customer',
+          lastName: rootState.profile.user?.lastName || 'User',
+          email: customerEmail
+        }
+      ],
+      contactInfo: {
+        email: customerEmail,
+        phone: '+1234567890' // You might want to get this from user profile
       }
     };
 
-    const {
-      // @ts-ignore
-      data: {
-        processBooking: { id: bookingProcessId }
-      }
-    } = await API.graphql(
-      graphqlOperation(processBookingMutation, processBookingInput)
-    );
+    console.log("Booking data:", bookingData);
 
-    console.log(`Booking Id: ${bookingProcessId}`);
+    const response = await fetch(`${process.env.VUE_APP_API_URL}/booking`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(bookingData)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to create booking');
+    }
+
+    console.log(`Booking created successfully: ${data.bookingId}`);
+    
+    // Transform the response to match your existing structure
+    const bookingResponse = {
+      id: data.bookingId,
+      bookingReference: data.bookingId,
+      status: 'CONFIRMED',
+      // Add other fields as needed
+    };
+
+    Loading.hide();
     console.groupEnd();
-    return bookingProcessId;
+    return bookingResponse;
+
   } catch (err) {
+    Loading.hide();
+    console.error(err);
+    throw err;
+  }
+}
+
+/**
+ * New action to get loyalty points
+ */
+export async function fetchLoyaltyPoints({ rootState }) {
+  try {
+    const userId = rootState.profile.user?.id;
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+
+    const response = await fetch(`${process.env.VUE_APP_API_URL}/loyalty?userId=${userId}`);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to fetch loyalty points');
+    }
+
+    return data;
+  } catch (err) {
+    console.error('Error fetching loyalty points:', err);
     throw err;
   }
 }
