@@ -1,184 +1,58 @@
-import Booking from "../../shared/models/BookingClass";
-// @ts-ignore
 import { Loading } from "quasar";
+import axios from "axios";
+
+// Use a mock payment endpoint or your actual test endpoint
+const paymentEndpoint = process.env.VUE_APP_PAYMENT_URL || "https://your-mock-payment-api.com/charge";
 
 /**
- * Fetch bookings from REST API
+ * Process test payment - uses Stripe test mode
  */
-export async function fetchBooking(
-  { commit, rootState, rootGetters },
-  paginationToken = ""
-) {
-  console.group("store/bookings/actions/fetchBooking");
+export async function processPayment({
+  paymentToken,
+  outboundFlight,
+  customerEmail
+}) {
+  console.group("store/bookings/actions/processPayment");
   Loading.show({
-    message: "Loading bookings..."
+    message: "Processing test payment..."
   });
 
+  if (!paymentToken) throw "Invalid payment token";
+
+  const chargeData = {
+    amount: outboundFlight.ticketPrice,
+    currency: "usd",
+    stripeToken: paymentToken.id, // Test token from Stripe.js
+    description: `Test payment by ${customerEmail}`,
+    email: customerEmail,
+    test_mode: true // Flag for test mode
+  };
+
+  console.log("Test charge data:", chargeData);
+  
   try {
-    const userId =
-      rootState.profile.user?.id || rootGetters["profile/userAttributes"]?.sub;
-    if (!userId) {
-      throw new Error("User not authenticated");
-    }
-
-    let url = `${process.env.VUE_APP_API_URL}/bookings?userId=${userId}`;
-    if (paginationToken) {
-      url += `&paginationToken=${paginationToken}`;
-    }
-
-    console.log("Fetching booking data from:", url);
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to fetch bookings");
-    }
-
-    console.log("RAW API RESPONSE FROM LAMBDA:", JSON.stringify(data, null, 2));
-
-    // Transform the API response to match your existing Booking class structure
-    const bookings = data.bookings.map(booking => {
-      const bookingData = {
-        id: booking.bookingID,
-        bookingReference: booking.bookingID,
-        status: "CONFIRMED",
-        customer: userId,
-        createdAt: new Date().toISOString(),
-        outboundFlight: {
-          id: booking.flight.id,
-          departureDate: booking.flight.departureDate,
-          departureAirportCode: booking.flight.departureAirportCode,
-          departureAirportName: booking.flight.departureAirportName,
-          departureCity: booking.flight.departureAirportCode,
-          arrivalDate: booking.flight.arrivalDate,
-          arrivalAirportCode: booking.flight.arrivalAirportCode,
-          arrivalAirportName: booking.flight.arrivalAirportName,
-          arrivalCity: booking.flight.arrivalAirportCode,
-          ticketPrice: booking.flight.ticketPrice,
-          ticketCurrency: "USD",
-          flightNumber: booking.flight.airline,
-          airline: booking.flight.airline,
-          seatCapacity: 180
-        },
-        checkedIn: false,
-        paymentToken: "mock_payment_token"
-      };
-
-      return new Booking(bookingData);
-    });
-
-    console.log("Transformed bookings:", bookings);
-
-    if (paginationToken) {
-      commit("APPEND_BOOKINGS", bookings);
-    } else {
-      commit("SET_BOOKINGS", bookings);
-    }
-    commit("SET_BOOKING_PAGINATION", data.paginationToken);
-
-    Loading.hide();
-    console.groupEnd();
-    return bookings;
-  } catch (err) {
-    Loading.hide();
-    console.error(err);
-    throw new Error(err);
-  }
-}
-
-/**
- * Create booking with mock payment (no Stripe required)
- */
-export async function createBooking({ rootState }, { outboundFlight }) {
-  console.group("store/bookings/actions/createBooking");
-  try {
-    const userId = rootState.profile.user?.id;
-    const customerEmail =
-      rootState.profile.user?.attributes?.email || rootState.profile.user?.email;
-
-    if (!userId) {
-      throw new Error("User not authenticated");
-    }
-
-    console.info(`Processing booking for flight ${outboundFlight.id}`);
-
+    // For demo, you can use a mock response or actual Stripe test API
+    const data = await axios.post(paymentEndpoint, chargeData);
+    
+    // If using mock endpoint, simulate success
+    const chargeId = data.data?.id || `ch_test_${Date.now()}`;
+    
     Loading.show({
-      message: "Creating a new booking..."
+      message: "Test payment authorized successfully..."
     });
 
-    // Prepare booking data for REST API
-    const bookingData = {
-      userId: userId,
-      flightId: outboundFlight.id,
-      passengers: [
-        {
-          firstName: rootState.profile.user?.firstName || "Customer",
-          lastName: rootState.profile.user?.lastName || "User",
-          email: customerEmail
-        }
-      ],
-      contactInfo: {
-        email: customerEmail,
-        phone: "+1234567890"
-      }
-    };
-
-    console.log("Booking data:", bookingData);
-
-    const response = await fetch(`${process.env.VUE_APP_API_URL}/booking`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(bookingData)
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to create booking");
-    }
-
-    console.log("Booking created successfully:", data);
-
-    const bookingResponse = {
-      id: data.bookingId,
-      bookingReference: data.bookingId,
-      status: "CONFIRMED"
-    };
-
-    Loading.hide();
     console.groupEnd();
-    return bookingResponse;
+    return chargeId;
   } catch (err) {
-    Loading.hide();
-    console.error(err);
-    throw err;
-  }
-}
-
-/**
- * Get loyalty points
- */
-export async function fetchLoyaltyPoints({ rootState }) {
-  try {
-    const userId = rootState.profile.user?.id;
-    if (!userId) {
-      throw new Error("User not authenticated");
+    console.error("Test payment error:", err);
+    
+    // For demo, you can simulate successful test payment
+    if (process.env.NODE_ENV === "development") {
+      console.log("Simulating successful test payment for demo");
+      Loading.hide();
+      return `ch_test_demo_${Date.now()}`;
     }
-
-    const response = await fetch(
-      `${process.env.VUE_APP_API_URL}/loyalty?userId=${userId}`
-    );
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to fetch loyalty points");
-    }
-
-    return data;
-  } catch (err) {
-    console.error("Error fetching loyalty points:", err);
+    
     throw err;
   }
 }
