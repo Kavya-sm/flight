@@ -42,33 +42,36 @@ export async function fetchBooking(
       throw new Error(data.error || 'Failed to fetch bookings');
     }
 
+    // ✅ ADD DEBUG: See the actual API response
+    console.log("RAW API RESPONSE FROM LAMBDA:", JSON.stringify(data, null, 2));
+
     // Transform the API response to match your existing Booking class structure
     const bookings = data.bookings.map(booking => {
-      // Create a booking object that matches your existing structure
+      // ✅ FIXED: Use booking.bookingID (capital D) instead of booking.bookingId
       const bookingData = {
-        id: booking.bookingId,
-        bookingReference: booking.bookingId,
-        status: booking.status?.toUpperCase() || 'CONFIRMED',
-        customer: booking.userId,
-        createdAt: booking.createdAt,
+        id: booking.bookingID,  // ✅ FIXED: booking.bookingID
+        bookingReference: booking.bookingID,  // ✅ FIXED: booking.bookingID
+        status: 'CONFIRMED',
+        customer: userId,
+        createdAt: new Date().toISOString(),
         outboundFlight: {
-          id: booking.flightId,
-          departureDate: booking.flightDetails.departure,
-          departureAirportCode: booking.flightDetails.from,
-          departureAirportName: `Airport ${booking.flightDetails.from}`,
-          departureCity: booking.flightDetails.from,
-          arrivalDate: booking.flightDetails.arrival,
-          arrivalAirportCode: booking.flightDetails.to,
-          arrivalAirportName: `Airport ${booking.flightDetails.to}`,
-          arrivalCity: booking.flightDetails.to,
-          ticketPrice: booking.totalPrice,
+          id: booking.flight.id,
+          departureDate: booking.flight.departureDate,
+          departureAirportCode: booking.flight.departureAirportCode,
+          departureAirportName: booking.flight.departureAirportName,
+          departureCity: booking.flight.departureAirportCode,
+          arrivalDate: booking.flight.arrivalDate,
+          arrivalAirportCode: booking.flight.arrivalAirportCode,
+          arrivalAirportName: booking.flight.arrivalAirportName,
+          arrivalCity: booking.flight.arrivalAirportCode,
+          ticketPrice: booking.flight.ticketPrice,
           ticketCurrency: 'USD',
-          flightNumber: booking.flightDetails.flightNumber || 'Unknown',
-          airline: booking.flightDetails.airline,
-          seatCapacity: booking.flightDetails.seats || 180
+          flightNumber: booking.flight.airline,
+          airline: booking.flight.airline,
+          seatCapacity: 180
         },
         checkedIn: false,
-        paymentToken: 'mock_payment_token' // Since we're using mock payments
+        paymentToken: 'mock_payment_token'
       };
       
       return new Booking(bookingData);
@@ -136,7 +139,7 @@ export async function createBooking(
       ],
       contactInfo: {
         email: customerEmail,
-        phone: '+1234567890' // You might want to get this from user profile
+        phone: '+1234567890'
       }
     };
 
@@ -156,14 +159,13 @@ export async function createBooking(
       throw new Error(data.error || 'Failed to create booking');
     }
 
-    console.log(`Booking created successfully: ${data.bookingId}`);
-    
+    console.log(`Booking created successfully:`, data);
+
     // Transform the response to match your existing structure
     const bookingResponse = {
       id: data.bookingId,
       bookingReference: data.bookingId,
       status: 'CONFIRMED',
-      // Add other fields as needed
     };
 
     Loading.hide();
