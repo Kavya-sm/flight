@@ -3,14 +3,7 @@ import Booking from "../../shared/models/BookingClass";
 import { Loading } from "quasar";
 
 /**
- *
- * Booking [Vuex Module Action](https://vuex.vuejs.org/guide/actions.html) - fetchBooking retrieves all bookings for current authenticated customer.
- *
- * It uses SET_BOOKINGS mutation to update Booking state with the latest bookings and flights associated with them.
- * @param {object} context - Vuex action context (context.commit, context.getters, context.state, context.dispatch)
- * @param {string} paginationToken - pagination token for loading additional bookings
- * @returns {promise} - Promise representing whether bookings from Booking service have been updated in the store
- * @see {@link SET_BOOKINGS} for more info on mutation
+ * Fetch bookings from REST API
  */
 export async function fetchBooking(
   { commit, rootState, rootGetters },
@@ -41,15 +34,13 @@ export async function fetchBooking(
       throw new Error(data.error || "Failed to fetch bookings");
     }
 
-    // ✅ ADD DEBUG: See the actual API response
     console.log("RAW API RESPONSE FROM LAMBDA:", JSON.stringify(data, null, 2));
 
     // Transform the API response to match your existing Booking class structure
     const bookings = data.bookings.map(booking => {
-      // ✅ FIXED: Use booking.bookingID (capital D) instead of booking.bookingId
       const bookingData = {
-        id: booking.bookingID, // ✅ FIXED: booking.bookingID
-        bookingReference: booking.bookingID, // ✅ FIXED: booking.bookingID
+        id: booking.bookingID,
+        bookingReference: booking.bookingID,
         status: "CONFIRMED",
         customer: userId,
         createdAt: new Date().toISOString(),
@@ -96,14 +87,7 @@ export async function fetchBooking(
 }
 
 /**
- *
- * Booking [Vuex Module Action](https://vuex.vuejs.org/guide/actions.html) - createBooking attempts payment charge via Payment service, and it effectively books a flight if payment is accepted.
- *
- * **NOTE**: It doesn't mutate the store
- * @param {object} context - Vuex action context (context.commit, context.getters, context.state, context.dispatch)
- * @param {object} obj - Object containing params required to create a booking
- * @param {Flight} obj.outboundFlight - Outbound Flight
- * @returns {promise} - Promise representing booking effectively made in the Booking service.
+ * Create booking with mock payment (no Stripe required)
  */
 export async function createBooking({ rootState }, { outboundFlight }) {
   console.group("store/bookings/actions/createBooking");
@@ -155,9 +139,8 @@ export async function createBooking({ rootState }, { outboundFlight }) {
       throw new Error(data.error || "Failed to create booking");
     }
 
-    console.log(`Booking created successfully:`, data);
+    console.log("Booking created successfully:", data);
 
-    // Transform the response to match your existing structure
     const bookingResponse = {
       id: data.bookingId,
       bookingReference: data.bookingId,
@@ -175,7 +158,7 @@ export async function createBooking({ rootState }, { outboundFlight }) {
 }
 
 /**
- * New action to get loyalty points
+ * Get loyalty points
  */
 export async function fetchLoyaltyPoints({ rootState }) {
   try {
