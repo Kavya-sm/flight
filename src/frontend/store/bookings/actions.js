@@ -20,7 +20,7 @@ export async function fetchBooking(
 ) {
   console.group("store/bookings/actions/fetchBooking");
   Loading.show({
-    message: "Loading bookings...",
+    message: "Loading bookings..."
   });
 
   try {
@@ -69,10 +69,10 @@ export async function fetchBooking(
           ticketCurrency: "USD",
           flightNumber: booking.flight.airline,
           airline: booking.flight.airline,
-          seatCapacity: 180,
+          seatCapacity: 180
         },
         checkedIn: false,
-        paymentToken: "mock_payment_token",
+        paymentToken: "mock_payment_token"
       };
 
       return new Booking(bookingData);
@@ -125,7 +125,7 @@ export async function createBooking(
     console.info(`Processing booking for flight ${outboundFlight.id}`);
 
     Loading.show({
-      message: "Creating a new booking...",
+      message: "Creating a new booking..."
     });
 
     // Prepare booking data for REST API
@@ -136,13 +136,13 @@ export async function createBooking(
         {
           firstName: rootState.profile.user?.firstName || "Customer",
           lastName: rootState.profile.user?.lastName || "User",
-          email: customerEmail,
-        },
+          email: customerEmail
+        }
       ],
       contactInfo: {
         email: customerEmail,
-        phone: "+1234567890",
-      },
+        phone: "+1234567890"
+      }
     };
 
     console.log("Booking data:", bookingData);
@@ -150,9 +150,9 @@ export async function createBooking(
     const response = await fetch(`${process.env.VUE_APP_API_URL}/booking`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify(bookingData),
+      body: JSON.stringify(bookingData)
     });
 
     const data = await response.json();
@@ -167,7 +167,7 @@ export async function createBooking(
     const bookingResponse = {
       id: data.bookingId,
       bookingReference: data.bookingId,
-      status: "CONFIRMED",
+      status: "CONFIRMED"
     };
 
     Loading.hide();
