@@ -10,7 +10,7 @@
     </div>
     <div class="bookings">
       <q-timeline color="secondary" class="q-pl-md">
-        <div class="booking" v-for="booking in bookings" :key="booking.id">
+        <div class="booking" v-for="booking in bookings" :key="booking.bookingID">
           <q-timeline-entry
             class="booking__entry"
             icon="flight_takeoff"
@@ -18,17 +18,22 @@
           >
             <h5 slot="subtitle" class="q-timeline-subtitle">
               <span data-test="booking-city-date">
-                {{ booking.outboundFlight.departureCity }} &mdash;
-                {{ booking.bookingDate }}
+                {{ booking.flight.departureAirportCode }} &mdash;
+                {{ formatDate(booking.flight.departureDate) }}
               </span>
             </h5>
             <booking-flight
-              :bookingID="booking.bookingReference"
-              :flight="booking.outboundFlight"
+              :bookingID="booking.bookingID"
+              :flight="booking.flight"
             />
           </q-timeline-entry>
         </div>
       </q-timeline>
+      <div v-if="bookings.length === 0" class="wrapper text-center q-mt-lg">
+        <q-icon name="flight" size="4rem" color="grey-5" />
+        <div class="q-title q-mt-md text-grey-6">No bookings yet</div>
+        <div class="q-subtitle text-grey-6">Book your first flight to see it here!</div>
+      </div>
       <div class="wrapper">
         <q-btn
           v-if="paginationToken"
@@ -75,14 +80,32 @@ export default {
     async loadBookings() {
       try {
         await this.$store.dispatch(
-          "bookings/fetchBooking",
+          "bookings/fetchBookings",  // Changed from fetchBooking to fetchBookings
           this.paginationToken
         );
       } catch (error) {
         console.error(error);
         this.$q.notify(
-          `Error while fetching Booking - Check browser console messages`
+          `Error while fetching Bookings - Check browser console messages`
         );
+      }
+    },
+    
+    /**
+     * Format date for display
+     */
+    formatDate(dateString) {
+      if (!dateString) return 'Unknown date';
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { 
+          weekday: 'short', 
+          year: 'numeric', 
+          month: 'short', 
+          day: 'numeric' 
+        });
+      } catch (e) {
+        return dateString;
       }
     }
   },
