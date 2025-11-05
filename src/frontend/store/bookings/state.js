@@ -7,5 +7,7 @@
  */
 export default {
   bookings: [],
-  paginationToken: ""
+  paginationToken: "",
+  loyaltyPoints: 0,
+  loyaltyTier: 'bronze'
 };
