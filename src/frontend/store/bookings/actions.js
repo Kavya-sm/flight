@@ -1,8 +1,6 @@
 import Booking from "../../shared/models/BookingClass";
-import Flight from "../../shared/models/FlightClass"; // eslint-disable-line
 // @ts-ignore
 import { Loading } from "quasar";
-import { processPayment } from "./payment";
 
 /**
  *
@@ -47,7 +45,7 @@ export async function fetchBooking(
     console.log("RAW API RESPONSE FROM LAMBDA:", JSON.stringify(data, null, 2));
 
     // Transform the API response to match your existing Booking class structure
-    const bookings = data.bookings.map((booking) => {
+    const bookings = data.bookings.map(booking => {
       // ✅ FIXED: Use booking.bookingID (capital D) instead of booking.bookingId
       const bookingData = {
         id: booking.bookingID, // ✅ FIXED: booking.bookingID
@@ -104,14 +102,10 @@ export async function fetchBooking(
  * **NOTE**: It doesn't mutate the store
  * @param {object} context - Vuex action context (context.commit, context.getters, context.state, context.dispatch)
  * @param {object} obj - Object containing params required to create a booking
- * @param {object} obj.paymentToken - Stripe JS Payment token object
  * @param {Flight} obj.outboundFlight - Outbound Flight
  * @returns {promise} - Promise representing booking effectively made in the Booking service.
  */
-export async function createBooking(
-  { commit, rootState },
-  { paymentToken, outboundFlight }
-) {
+export async function createBooking({ rootState }, { outboundFlight }) {
   console.group("store/bookings/actions/createBooking");
   try {
     const userId = rootState.profile.user?.id;
