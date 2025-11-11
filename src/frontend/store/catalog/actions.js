@@ -34,7 +34,7 @@ const actions = {
   /**
    * Fetch flights from REST API (Lambda backend)
    */
-  async fetchFlights({ commit }, { departure, arrival, paginationToken }) {
+  async fetchFlights({ commit }, { departure, arrival}) {
     console.group("store/catalog/actions/fetchFlights");
     commit("SET_LOADER", true);
 
