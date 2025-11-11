@@ -7,9 +7,7 @@
         </div>
       </div>
     </div>
-
     <div class="search__options q-pa-sm">
-      <!-- ✈️ Departure airport -->
       <q-field
         class="home-icons search__options--input search__departure"
         icon="flight_takeoff"
@@ -28,14 +26,9 @@
             :static-data="{ field: 'city', list: suggestionList }"
             :filter="fuzzySearchFilter"
             value-field="sublabel"
-            label-field="city"
-            emit-value
-            map-options
           />
         </q-input>
       </q-field>
-
-      <!-- 🛬 Arrival airport -->
       <q-field
         class="home-icons search__options--input search__arrival"
         icon="flight_land"
@@ -53,14 +46,9 @@
             :static-data="{ field: 'city', list: suggestionList }"
             :filter="fuzzySearchFilter"
             value-field="sublabel"
-            label-field="city"
-            emit-value
-            map-options
           />
         </q-input>
       </q-field>
-
-      <!-- 📅 Date picker -->
       <q-field
         icon="calendar_today"
         icon-color="primary"
@@ -74,8 +62,6 @@
         />
       </q-field>
     </div>
-
-    <!-- 🔍 Search button -->
     <div class="wrapper">
       <q-btn
         @click="search"
@@ -83,10 +69,10 @@
         color="secondary"
         label="Search flights"
         :disable="
-          !$v.departureCity.required ||
-          !$v.arrivalCity.required ||
-          $v.departureCity.$invalid ||
-          $v.arrivalCity.$invalid
+          !$v.departureCity.isAirport ||
+            $v.departureCity.$invalid ||
+            !$v.arrivalCity.isAirport ||
+            $v.arrivalCity.$invalid
         "
       >
         <q-icon
@@ -108,32 +94,58 @@ import { validationMixin } from "vuelidate";
 import { required, minLength } from "vuelidate/lib/validators";
 
 /**
- * Parses airports into Quasar autocomplete format.
+ * parse list of airports provided from Catalog module
+ *
+ * @return {object} - list of airports following auto-suggestion Quasar component contract
  */
 const parseAirports = () => {
-  return airports.map(country => ({
-    city: country.city,
-    label: `${country.city} (${country.code})`,
-    sublabel: country.code // IATA code
-  }));
+  return airports.map(country => {
+    return {
+      city: country.city,
+      label: country.name,
+      sublabel: country.code
+    };
+  });
 };
 
 /**
- * Checks if the selected airport is valid.
+ * Validate given input against list of valid IATA airports
+ * @param {string} value - Given airport input by customer
+ * @param {object} vm - Vue scope so outer functions can access store/Vue data
+ * @return {boolean} - Boolean whether given airport is a valid IATA airport from airport list
  */
 const isAirport = (value, vm) => {
+  // TODO: debounce or throttle this function in compliance with vuelidate
   return vm.suggestionList.some(airport => airport.sublabel === value);
 };
 
 export default {
+  /**
+   *
+   * Search view displays options for searching a flight given a departure, arrival and a date.
+   */
   name: "Search",
   mixins: [validationMixin],
   validations: {
-    departureCity: { required, minLength: minLength(3), isAirport },
-    arrivalCity: { required, minLength: minLength(3), isAirport }
+    departureCity: {
+      required,
+      minLength: minLength(3),
+      isAirport
+    },
+    arrivalCity: {
+      required,
+      minLength: minLength(3),
+      isAirport
+    }
   },
   data() {
     return {
+      /**
+       * @param {object} departureCity - Departure city chosen by the customer
+       * @param {object} arrivalCity - Arrival city chosen by the customer
+       * @param {object} departureDate - Departure date chosen by the customer
+       * @param {object} suggestionList - Parsed list of airports offered as auto-suggestion
+       */
       departureCity: "",
       arrivalCity: "",
       departureDate: new Date(),
@@ -142,11 +154,9 @@ export default {
   },
   methods: {
     /**
-     * Pushes query parameters (with IATA codes) to the search results route.
+     * search method collects form data, create queryStrings, and redirects to Search Results view
      */
     search() {
-      console.log("✈️ Searching flights:", this.departureCity, "→", this.arrivalCity);
-
       this.$router.push({
         name: "searchResults",
         query: {
@@ -156,22 +166,23 @@ export default {
         }
       });
     },
-
     /**
-     * Uses fuzzy search to match city names or codes.
+     * fuzzySearchFilter method uses Fuse library to easily find airports whether that is city, IATA, initials, etc.
      */
     fuzzySearchFilter(terms, { field, list }) {
       const token = terms.toLowerCase();
-      const options = {
+      var options = {
         shouldSort: true,
         threshold: 0.3,
+        location: 0,
         distance: 100,
         maxPatternLength: 10,
         minMatchCharLength: 3,
         keys: [field, "sublabel"]
       };
-      const fuse = new Fuse(list, options);
-      return fuse.search(token);
+      let fuse = new Fuse(list, options);
+      let result = fuse.search(token);
+      return result;
     }
   }
 };
@@ -184,15 +195,6 @@ export default {
   padding 0.3rem 1.5rem
   max-width 30rem
   margin auto
-
-.wrapper
-  display flex
-  flex-direction column
-  align-items center
-  margin-top 1rem
-
-.cta__button
-  margin-top 2rem
-  width 200px
 </style>
+
 
