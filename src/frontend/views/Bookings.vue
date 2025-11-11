@@ -79,7 +79,6 @@ export default {
      */
     async loadBookings() {
       try {
-        // Removed paginationToken parameter since it's not used in the action
         await this.$store.dispatch("bookings/fetchBookings");
       } catch (error) {
         console.error(error);
