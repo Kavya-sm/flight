@@ -58,7 +58,7 @@
         <q-fab-action
           color="secondary"
           icon="cancel"
-          @click="filteredFlights = flights"
+          @click="resetFilters"
           glossy
           class="filter__cta"
         />
@@ -71,7 +71,7 @@
         </div>
         <div v-if="filteredFlights.length && !loading">
           <span class="results__headline" data-test="results-headline"
-            >Select your flight</span
+            >Select your flight ({{ filteredFlights.length }} found from {{ departure }} to {{ arrival }})</span
           >
         </div>
         <div
@@ -81,7 +81,7 @@
           <span
             class="justify-center full-width results__error"
             data-test="results-error"
-            >No results found</span
+            >No flights found from {{ departure }} to {{ arrival }}</span
           >
           <transition enter-active-class="animated bounce" appear>
             <q-btn
@@ -132,9 +132,6 @@ import { mapState, mapGetters } from "vuex";
 import { priceFilter, scheduleFilter } from "../shared/mixins/filters";
 import { priceSorter, scheduleSorter } from "../shared/mixins/sorters";
 
-/**
- * Flight Results view displays a collection of Flights from Catalog.
- */
 export default {
   name: "FlightResults",
   components: {
@@ -143,22 +140,11 @@ export default {
     FlightLoader
   },
   mixins: [priceFilter, scheduleFilter, priceSorter, scheduleSorter],
-  /**
-   * @param {string} date - Departure date one wishes to travel by
-   * @param {string} departure - Departure airport IATA one wishes to travel from
-   * @param {string} arrival - Arrival airport IATA one wishes to travel to
-   */
   props: {
     date: { type: String, required: true },
     departure: { type: String, required: true },
     arrival: { type: String, required: true }
   },
-  /**
-   * @param {Flight[]} filteredFlights - List of Flights filtered by departure, price or schedule
-   * @param {string} departureTimeFilter - Departure schedule one wishes to filter flights by
-   * @param {string} arrivalTimeFilter - Arrival schedule one wishes to filter flights by
-   * @param {string} maxPriceFilter - Maximum price one wishes to limit flights to
-   */
   data() {
     return {
       filteredFlights: [],
@@ -168,22 +154,31 @@ export default {
     };
   },
   mounted() {
-    /** authentication guards prevent authenticated users to view Flights
-     * however, the component doesn't stop from rendering asynchronously
-     * this guarantees we attempt talking to Catalog service
-     * if our authentication guards && profile module have an user in place
-     */
     if (this.isAuthenticated) {
       this.loadFlights();
     }
   },
+  watch: {
+    // Reload flights when route parameters change
+    '$route.query': {
+      handler(newQuery) {
+        if (this.isAuthenticated && newQuery.departure && newQuery.arrival) {
+          this.loadFlights();
+        }
+      },
+      immediate: true
+    }
+  },
   methods: {
-    /**
-     * loadFlights method fetches all flights via catalog API
-     */
     async loadFlights() {
       try {
         if (this.isAuthenticated) {
+          console.log("Loading flights with params:", {
+            date: this.date,
+            departure: this.departure,
+            arrival: this.arrival
+          });
+
           await this.$store.dispatch("catalog/fetchFlights", {
             date: this.date,
             departure: this.departure,
@@ -191,49 +186,41 @@ export default {
             paginationToken: this.paginationToken
           });
 
-          this.filteredFlights = this.sortByDeparture(this.flights);
+          // Use unique flights to avoid duplicates
+          this.filteredFlights = this.sortByDeparture(this.uniqueFlights);
+          console.log("Filtered flights:", this.filteredFlights);
         }
       } catch (error) {
-        console.error(error);
+        console.error("Error loading flights:", error);
         this.$q.notify(
           `Error while fetching Flight results - Check browser console messages`
         );
       }
     },
-    /**
-     * setPrice method updates maxPriceFilter and filter flights via filterByMaxPrice mixin
-     */
     setPrice() {
-      let flights = this.filterByMaxPrice(this.flights, this.maxPriceFilter);
+      let flights = this.filterByMaxPrice(this.uniqueFlights, this.maxPriceFilter);
       flights = this.sortByPrice(flights);
       this.filteredFlights = flights;
     },
-    /**
-     * setDeparture method updates departureTimeFilter and filter flights via filterBySchedule mixin
-     */
     setDeparture() {
-      let flights = this.filterBySchedule(this.flights, {
+      let flights = this.filterBySchedule(this.uniqueFlights, {
         departure: this.departureTimeFilter
       });
       flights = this.sortByDeparture(flights);
       this.filteredFlights = flights;
     },
-    /**
-     * setArrival method updates arrivalTimeFilter and filter flights via filterBySchedule mixin
-     */
     setArrival() {
-      this.filteredFlights = this.filterBySchedule(this.flights, {
+      this.filteredFlights = this.filterBySchedule(this.uniqueFlights, {
         arrival: this.arrivalTimeFilter
       });
+    },
+    resetFilters() {
+      this.departureTimeFilter = "";
+      this.arrivalTimeFilter = "";
+      this.maxPriceFilter = 300;
+      this.filteredFlights = this.sortByDeparture(this.uniqueFlights);
     }
   },
-  /**
-   * @param {Flight} flights - Flights state from Flights module
-   * @param {boolean} loading - Loader state used to control Flight Loader when fetching flights
-   * @param {boolean} isAuthenticated - Getter from Profile module
-   * @param {number} maximumPrice - Maximum ticket price calculated across all available flights
-   * @param {number} minimumPrice - Minimum ticket price calculated across all available flights
-   */
   computed: {
     ...mapState({
       flights: state => state.catalog.flights,
@@ -241,11 +228,20 @@ export default {
       paginationToken: state => state.catalog.paginationToken
     }),
     ...mapGetters("profile", ["isAuthenticated"]),
+    
+    uniqueFlights() {
+      return this.flights.filter((flight, index, self) => 
+        index === self.findIndex(f => f.id === flight.id)
+      );
+    },
+    
     maximumPrice: function() {
-      return Math.max(...this.flights.map(filter => filter.ticketPrice), 500);
+      const prices = this.uniqueFlights.map(filter => filter.ticketPrice);
+      return prices.length > 0 ? Math.max(...prices) : 500;
     },
     minimumPrice: function() {
-      return Math.min(...this.flights.map(filter => filter.ticketPrice), 1);
+      const prices = this.uniqueFlights.map(filter => filter.ticketPrice);
+      return prices.length > 0 ? Math.min(...prices) : 1;
     }
   }
 };
