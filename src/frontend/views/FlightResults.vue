@@ -173,9 +173,9 @@ export default {
      * this guarantees we attempt talking to Catalog service
      * if our authentication guards && profile module have an user in place
      */
-    if (this.isAuthenticated) {
+  //  if (this.isAuthenticated) {
       this.loadFlights();
-    }
+   // }
   },
   methods: {
     /**
