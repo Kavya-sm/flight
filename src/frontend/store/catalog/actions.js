@@ -26,19 +26,15 @@ export async function fetchFlights({ commit }, { date, departure, arrival, pagin
     const data = await response.json();
     console.log("📦 Raw API response:", data);
     
-    // FIXED: Handle the API response properly
+    // Handle the API response properly
     let flightsData;
     if (data && typeof data.body === 'string') {
-      // API returns { body: "[{...}]" } where body is a JSON string
       flightsData = JSON.parse(data.body);
     } else if (Array.isArray(data)) {
-      // If response is directly an array
       flightsData = data;
     } else if (data && Array.isArray(data.body)) {
-      // If body is already an array
       flightsData = data.body;
     } else {
-      // Fallback
       flightsData = data || [];
     }
 
@@ -60,18 +56,24 @@ export async function fetchFlights({ commit }, { date, departure, arrival, pagin
 
     const flights = uniqueFlightsData.map(flightData => {
       console.log("✈️ Processing flight:", flightData);
+      
+      // MAP API PROPERTIES TO FLIGHT CLASS EXPECTED PROPERTIES
       return new Flight({
         id: flightData.id,
         departureDate: flightData.departure,
-        departureAirportCode: flightData.from,
-        departureAirportName: flightData.from,
+        departureAirportCode: flightData.from,  // Map 'from' to 'departureAirportCode'
+        departureAirportName: flightData.from,  // Use 'from' as airport name too
+        departureCity: flightData.from,         // Use 'from' as city name
+        departureLocale: "UTC",                 // Default timezone
         arrivalDate: flightData.arrival,
-        arrivalAirportCode: flightData.to,
-        arrivalAirportName: flightData.to,
-        ticketPrice: flightData.price,
+        arrivalAirportCode: flightData.to,      // Map 'to' to 'arrivalAirportCode'
+        arrivalAirportName: flightData.to,      // Use 'to' as airport name too
+        arrivalCity: flightData.to,             // Use 'to' as city name
+        arrivalLocale: "UTC",                   // Default timezone
+        ticketPrice: flightData.price,          // Map 'price' to 'ticketPrice'
         ticketCurrency: "EUR",
-        flightNumber: flightData.id,
-        seatCapacity: flightData.seats || 100
+        flightNumber: flightData.id,            // Use id as flight number
+        seatCapacity: flightData.seats || 100   // Map 'seats' to 'seatCapacity'
       });
     });
 
@@ -107,7 +109,6 @@ export async function fetchByFlightId({ commit }, { flightId }) {
 
     const data = await response.json();
     
-    // FIXED: Use the same response handling logic
     let flightsData;
     if (data && typeof data.body === 'string') {
       flightsData = JSON.parse(data.body);
@@ -125,14 +126,19 @@ export async function fetchByFlightId({ commit }, { flightId }) {
       throw new Error(`Flight with ID ${flightId} not found`);
     }
 
+    // MAP API PROPERTIES TO FLIGHT CLASS EXPECTED PROPERTIES
     const flight = new Flight({
       id: flightData.id,
       departureDate: flightData.departure,
       departureAirportCode: flightData.from,
       departureAirportName: flightData.from,
+      departureCity: flightData.from,
+      departureLocale: "UTC",
       arrivalDate: flightData.arrival,
       arrivalAirportCode: flightData.to,
       arrivalAirportName: flightData.to,
+      arrivalCity: flightData.to,
+      arrivalLocale: "UTC",
       ticketPrice: flightData.price,
       ticketCurrency: "EUR",
       flightNumber: flightData.id,
