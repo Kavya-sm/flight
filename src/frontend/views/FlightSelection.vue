@@ -103,9 +103,17 @@
             </div>
           </form>
         </div>
+        <!-- Temporary debug button -->
+        <q-btn 
+          @click="debugAuth" 
+          class="q-mt-md" 
+          color="warning" 
+          label="Debug Auth Data"
+          size="sm"
+        />
         <q-btn
           @click="payment"
-          class="cta__button text-weight-medium"
+          class="cta__button text-weight-medium q-mt-md"
           color="secondary"
           label="Agree and pay now"
           :disable="$v.form.$invalid || form.isCardInvalid"
@@ -204,6 +212,9 @@ export default {
      * once loaded we attach Stripe Elements to custom DOM elements
      * that makes payment credit card collection seamless through iFrame while providing an unified experience
      */
+    console.log("🔐 Auth store on mount:", this.$store.state.auth);
+    console.log("👤 Customer data on mount:", this.customer);
+    
     let stripeElements = this.loadStripeJS();
     stripeElements
       .then(() => this.loadStripeElements())
@@ -253,6 +264,34 @@ export default {
   },
   methods: {
     /**
+     * Debug method to check auth structure
+     */
+    debugAuth() {
+      console.group("🐛 DEBUG Auth Structure");
+      console.log("Full auth store:", this.$store.state.auth);
+      console.log("Auth user object:", this.$store.state.auth.user);
+      console.log("Customer getter:", this.customer);
+      console.log("First name getter:", this.firstName);
+      
+      // Test all possible user ID locations
+      const possibleUserIds = {
+        'auth.user.id': this.$store.state.auth.user?.id,
+        'auth.userId': this.$store.state.auth.userId,
+        'auth.user.sub': this.$store.state.auth.user?.sub,
+        'auth.user.username': this.$store.state.auth.user?.username,
+        'auth.attributes.sub': this.$store.state.auth.attributes?.sub
+      };
+      
+      console.log("Possible User IDs:", possibleUserIds);
+      
+      // Find the first truthy value
+      const userId = Object.values(possibleUserIds).find(val => val);
+      console.log("First valid User ID:", userId);
+      
+      console.groupEnd();
+    },
+
+    /**
      * Tokenize form and credit card data, and make charge request against Payment service
      * Given a successful payment it attempts to create a booking with Booking service
      * If booking completes successfuly, it redirects the customer to the Bookings view
@@ -271,25 +310,70 @@ export default {
 
         if (this.token.error) throw this.token.error;
 
+        // DEBUG: Check what data we have
+        console.log("🔐 Auth store:", this.$store.state.auth);
+        console.log("👤 Customer data:", this.customer);
+        console.log("👤 First name:", this.firstName);
+
+        // Get userId from auth store
+        const userId = this.$store.state.auth.user?.id || 
+                       this.$store.state.auth.userId ||
+                       this.$store.state.auth.user?.sub ||
+                       this.$store.state.auth.user?.username;
+
+        console.log("🆔 Extracted userId:", userId);
+
+        if (!userId) {
+          throw new Error("User not authenticated. Please log in.");
+        }
+
+        // Create passengers array from form data
+        const passengers = [{
+          name: this.form.name || 'Passenger',
+          email: this.customer?.email || this.form.name + '@example.com'
+        }];
+
+        // Create contact info from form data
+        const contactInfo = {
+          email: this.customer?.email || this.form.name + '@example.com',
+          phone: this.customer?.phone_number || '+1234567890',
+          name: this.form.name
+        };
+
+        console.log("📤 Booking data being sent:", {
+          userId,
+          passengers,
+          contactInfo,
+          outboundFlight: this.selectedFlight
+        });
+
+        // Call createBooking with ALL required parameters
         await this.$store.dispatch("bookings/createBooking", {
           paymentToken: this.token,
-          outboundFlight: this.selectedFlight
+          outboundFlight: this.selectedFlight,
+          userId: userId,
+          passengers: passengers,
+          contactInfo: contactInfo
         });
 
         // eslint-disable-next-line
         this.$q.loading.show({
-          message: `Your booking is being processed - We'll soon contact you via ${this.customer.email}.`
+          message: `Your booking is being processed - We'll soon contact you via ${contactInfo.email}.`
         });
+        
         setTimeout(() => {
           this.$q.loading.hide();
           this.$router.push({ name: "bookings" });
         }, 3000);
+        
       } catch (err) {
         this.$q.loading.hide();
-        this.$q.notify(
-          `Error while creating your Booking - Check browser console messages`
-        );
-        console.error(err);
+        console.error("❌ Payment error:", err);
+        this.$q.notify({
+          type: 'negative',
+          message: `Error creating booking: ${err.message}`,
+          timeout: 5000
+        });
       }
     },
     /**
