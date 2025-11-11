@@ -1,50 +1,43 @@
 import Flight from "../../shared/models/FlightClass";
 
 /**
- * Fetch flights for a given route from your Lambda REST API.
- * Filters duplicates, clears previous results, and updates Vuex cleanly.
+ * Catalog Action — fetchFlights
+ * Fetches flights from your Lambda REST API and filters them by route.
  */
 export async function fetchFlights({ commit }, { departure, arrival }) {
   console.group("store/catalog/actions/fetchFlights");
   commit("SET_LOADER", true);
 
   try {
-    // 🧹 Clear old data before loading new flights
-    commit("SET_FLIGHTS", []);
-
-    console.log(`✈️ Fetching flights via Lambda for ${departure} → ${arrival}`);
-
-    // 🔹 Call your Lambda REST API with query parameters
     const url = `https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/search?from=${departure}&to=${arrival}`;
+    console.log("🌐 Fetching:", url);
+
     const response = await fetch(url);
     const data = await response.json();
+    console.log("📦 Raw Lambda response:", data);
 
-    // 🔹 Handle both stringified and parsed body cases
+    // Handle both stringified & parsed bodies
     let flightsData = [];
     if (typeof data.body === "string") {
       flightsData = JSON.parse(data.body);
     } else if (Array.isArray(data.body)) {
       flightsData = data.body;
     } else {
-      flightsData = data.Items || data || [];
+      flightsData = data.Items || [];
     }
 
-    console.log(`🔸 Raw flights received: ${flightsData.length}`);
+    console.log("✈️ All flights received:", flightsData);
 
-    // ✅ Remove duplicates (same flight ID)
-    const uniqueFlights = [];
-    const seen = new Set();
-    for (const f of flightsData) {
-      if (f && !seen.has(f.id)) {
-        seen.add(f.id);
-        uniqueFlights.push(f);
-      }
-    }
+    // Filter by route (case-insensitive)
+    const filteredFlightsData = flightsData.filter(
+      flight =>
+        flight.from?.toLowerCase() === departure?.toLowerCase() &&
+        flight.to?.toLowerCase() === arrival?.toLowerCase()
+    );
+    console.log("✅ Filtered flights:", filteredFlightsData);
 
-    console.log(`✅ Unique flights after filtering: ${uniqueFlights.length}`);
-
-    // 🔹 Convert each to Flight class instance
-    const flights = uniqueFlights.map(flightData =>
+    // Map to Flight model instances
+    const flights = filteredFlightsData.map(flightData =>
       new Flight({
         id: flightData.id,
         departureDate: flightData.departure,
@@ -60,31 +53,34 @@ export async function fetchFlights({ commit }, { departure, arrival }) {
       })
     );
 
-    // ✅ Update Vuex store
+    console.log("🛫 Final mapped flights:", flights);
+
+    // Commit to Vuex
     commit("SET_FLIGHTS", flights);
     commit("SET_FLIGHT_PAGINATION", null);
-
-    console.log("🟢 Flights stored in Vuex:", flights.length);
-    commit("SET_LOADER", false);
-    console.groupEnd();
   } catch (error) {
     console.error("❌ Error fetching flights:", error);
-    commit("SET_LOADER", false);
     throw error;
+  } finally {
+    commit("SET_LOADER", false);
+    console.groupEnd();
   }
 }
 
 /**
- * Fetch a specific flight by ID (used in SelectedFlight page)
+ * Catalog Action — fetchByFlightId
+ * Fetches one flight by ID (used on FlightSelection page).
  */
 export async function fetchByFlightId({ commit }, { flightId }) {
   console.group("store/catalog/actions/fetchByFlightId");
   commit("SET_LOADER", true);
 
   try {
-    const response = await fetch(
-      "https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/search"
-    );
+    const url =
+      "https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/search";
+    console.log("🌐 Fetching:", url);
+
+    const response = await fetch(url);
     const data = await response.json();
 
     let flightsData = [];
@@ -93,10 +89,10 @@ export async function fetchByFlightId({ commit }, { flightId }) {
     } else if (Array.isArray(data.body)) {
       flightsData = data.body;
     } else {
-      flightsData = data.Items || data || [];
+      flightsData = data.Items || [];
     }
 
-    const flightData = flightsData.find(flight => flight.id === flightId);
+    const flightData = flightsData.find(f => f.id === flightId);
     if (!flightData) throw new Error(`Flight with ID ${flightId} not found`);
 
     const flight = new Flight({
@@ -113,16 +109,17 @@ export async function fetchByFlightId({ commit }, { flightId }) {
       seatCapacity: flightData.seats || 100
     });
 
-    console.log("✅ Fetched flight by ID:", flight);
-    commit("SET_LOADER", false);
-    console.groupEnd();
+    console.log("✅ Fetched single flight:", flight);
     return flight;
   } catch (error) {
     console.error("❌ Error fetching flight by ID:", error);
-    commit("SET_LOADER", false);
     throw error;
+  } finally {
+    commit("SET_LOADER", false);
+    console.groupEnd();
   }
 }
+
 
 
 
