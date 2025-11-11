@@ -1,4 +1,3 @@
-// store/catalog/actions.js
 import Flight from "../../shared/models/FlightClass";
 
 /**
@@ -17,38 +16,21 @@ import Flight from "../../shared/models/FlightClass";
  * @see {@link SET_FLIGHTS} for more info on mutation
  * @see {@link SET_LOADER} for more info on mutation
  */
-export async function fetchFlights({ commit }, { date, departure, arrival, paginationToken = null }) {
+export async function fetchFlights({ commit }, { departure, arrival }) {
   console.group("store/catalog/actions/fetchFlights");
   commit("SET_LOADER", true);
 
   try {
     console.log("Fetching flight data via REST API");
 
-    // Build URL with all parameters
-    const url = `https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/search?from=${departure}&to=${arrival}`;
-    // Note: If your API supports date filtering, add: &date=${date}
-
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    let flightsData;
-    if (typeof data.body === 'string') {
-      flightsData = JSON.parse(data.body);
-    } else {
-      flightsData = data.body || data;
-    }
-
-    // Ensure it's an array
-    if (!Array.isArray(flightsData)) {
-      flightsData = [flightsData];
-    }
-
-    // Remove duplicates by flight ID before creating Flight objects
-    const uniqueFlightsData = flightsData.filter((flight, index, self) => 
-      index === self.findIndex(f => f.id === flight.id)
+    const response = await fetch(
+      `https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/search?from=${departure}&to=${arrival}`
     );
 
-    const flights = uniqueFlightsData.map(flightData =>
+    const data = await response.json();
+    const flightsData = JSON.parse(data.body);
+
+    const flights = flightsData.map(flightData =>
       new Flight({
         id: flightData.id,
         departureDate: flightData.departure,
@@ -64,14 +46,14 @@ export async function fetchFlights({ commit }, { date, departure, arrival, pagin
       })
     );
 
-    console.log("Unique flights:", flights);
+    console.log(flights);
     commit("SET_FLIGHTS", flights);
-    commit("SET_FLIGHT_PAGINATION", paginationToken);
+    commit("SET_FLIGHT_PAGINATION", null);
     commit("SET_LOADER", false);
     console.groupEnd();
   } catch (error) {
     commit("SET_LOADER", false);
-    console.error("Error fetching flights:", error);
+    console.error(error);
     throw new Error(error);
   }
 }
