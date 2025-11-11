@@ -8,7 +8,7 @@ const BOOKINGS_API_URL = "https://uqeubfps3l.execute-api.ap-south-1.amazonaws.co
  */
 export async function createBooking(
   { commit, rootState },
-  { outboundFlight, passengers, contactInfo, userId }
+  { outboundFlight, passengers, contactInfo, userId, paymentToken }
 ) {
   console.group("store/bookings/actions/createBooking");
   Loading.show({ message: "Creating booking..." });
@@ -16,7 +16,47 @@ export async function createBooking(
   try {
     // Get userId from auth store if not provided
     if (!userId) {
-      userId = rootState.auth?.user?.id || rootState.auth?.userId;
+      userId = rootState.auth?.user?.id || 
+               rootState.auth?.userId ||
+               rootState.auth?.user?.sub ||
+               rootState.auth?.user?.username;
+      
+      console.log("🔄 Retrieved userId from auth:", userId);
+    }
+
+    if (!userId) {
+      throw new Error("User ID is required. Please log in.");
+    }
+    
+    if (!outboundFlight || !outboundFlight.id) {
+      throw new Error("Flight information is required");
+    }
+    
+    // Provide default passengers if undefined
+    if (!passengers) {
+      passengers = [{
+        name: 'Passenger',
+        email: 'passenger@example.com'
+      }];
+      console.warn("⚠️ Using default passengers:", passengers);
+    }
+    
+    if (passengers.length === 0) {
+      throw new Error("At least one passenger is required");
+    }
+    
+    // Provide default contact info if undefined
+    if (!contactInfo) {
+      contactInfo = {
+        email: passengers[0]?.email || 'contact@example.com',
+        phone: '+1234567890',
+        name: passengers[0]?.name || 'Passenger'
+      };
+      console.warn("⚠️ Using default contact info:", contactInfo);
+    }
+    
+    if (!contactInfo.email) {
+      throw new Error("Contact information with email is required");
     }
 
     const bookingData = {
@@ -26,7 +66,7 @@ export async function createBooking(
       contactInfo: contactInfo
     };
 
-    console.log("📤 Booking data:", bookingData);
+    console.log("📤 Final validated booking data:", bookingData);
 
     const response = await fetch(`${BOOKINGS_API_URL}/booking`, {
       method: "POST",
@@ -75,7 +115,10 @@ export async function fetchBookings({ commit, rootState }) {
 
   try {
     // Get userId from auth store
-    const userId = rootState.auth?.user?.id || rootState.auth?.userId;
+    const userId = rootState.auth?.user?.id || 
+                   rootState.auth?.userId ||
+                   rootState.auth?.user?.sub ||
+                   rootState.auth?.user?.username;
 
     if (!userId) {
       throw new Error("No user ID available. Please log in.");
