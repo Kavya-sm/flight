@@ -1,21 +1,14 @@
-
 // @ts-nocheck
 /**
- *
- * Catalog [Vuex Module Mutation](https://vuex.vuejs.org/guide/mutations.html) - SET_FLIGHT mutates Catalog state with an array of Flights as payload.
- * @param {object} state - Vuex Catalog Module State
- * @param {Flight[]} flights - Array of Flights as payload
- * @see {@link fetchFlights} for more info on action that calls SET_FLIGHTS
- * @see {@link fetchByFlightNumber} for more info on action that calls SET_FLIGHTS
+ * SET_FLIGHTS mutates Catalog state with an array of Flights as payload.
  */
-export const SET_FLIGHTS = async (state, flights) => {
-  if (state.flights.length === 0) {
-    state.flights = flights;
-  } else {
-    // flatten array of flights and remove possible duplicates due to network issues
-    let newFlights = [...flights, state.flights].flat(5);
-    state.flights = [...new Set(newFlights)];
-  }
+export const SET_FLIGHTS = (state, flights) => {
+  console.log("🔄 SET_FLIGHTS: Replacing flights with", flights.length, "flights");
+  
+  // ALWAYS replace the flights array with the new results
+  state.flights = flights;
+  
+  console.log("✅ SET_FLIGHTS: State now has", state.flights.length, "flights");
 };
 
 /**
@@ -27,13 +20,4 @@ export const SET_LOADER = (state, isLoading) => {
 
 export const SET_FLIGHT_PAGINATION = (state, paginationToken) => {
   state.paginationToken = paginationToken;
-};
-
-/**
- * Catalog [Vuex Module] - Holds flights information from Catalog service.
- */
-export default {
-  flights: [],
-  loading: false,
-  paginationToken: ""
 };
