@@ -1,34 +1,64 @@
 // @ts-nocheck
+
 /**
- *
- * Catalog [Vuex Module Mutation](https://vuex.vuejs.org/guide/mutations.html) - SET_FLIGHT mutates Catalog state with an array of Flights as payload.
+ * Catalog [Vuex Module Mutation](https://vuex.vuejs.org/guide/mutations.html)
+ * - SET_FLIGHTS replaces the current flight list with a new one.
+ *   Ensures duplicates are removed based on flight ID.
  * @param {object} state - Vuex Catalog Module State
  * @param {Flight[]} flights - Array of Flights as payload
- * @see {@link fetchFlights} for more info on action that calls SET_FLIGHTS
- * @see {@link fetchByFlightNumber} for more info on action that calls SET_FLIGHTS
  */
-export const SET_FLIGHTS = async (state, flights) => {
-  if (state.flights.length === 0) {
-    state.flights = flights;
-  } else {
-    // flatten array of flights and remove possible duplicates due to network issues
-    let newFlights = [...flights, state.flights].flat(5);
-    state.flights = [...new Set(newFlights)];
+export const SET_FLIGHTS = (state, flights) => {
+  if (!Array.isArray(flights)) {
+    console.warn("⚠️ SET_FLIGHTS called with non-array payload");
+    flights = [];
   }
+
+  // ✅ Deduplicate flights by ID
+  const uniqueFlights = [];
+  const seen = new Set();
+
+  for (const f of flights) {
+    if (f && !seen.has(f.id)) {
+      seen.add(f.id);
+      uniqueFlights.push(f);
+    }
+  }
+
+  state.flights = uniqueFlights;
 };
 
 /**
- *
- * Catalog [Vuex Module Mutation](https://vuex.vuejs.org/guide/mutations.html) - SET_LOADER mutates Catalog state to control content loader when necessary.
- * @param {object} state - Vuex Catalog Module State
- * @param {boolean} isLoading - Boolean that controls whether content loader should be running
- * @see {@link fetchFlights} for more info on action that calls SET_LOADER
- * @see {@link fetchByFlightNumber} for more info on action that calls SET_LOADER
+ * Catalog [Vuex Module Mutation] - APPEND_FLIGHTS appends unique flights
+ * (used only when pagination is implemented)
  */
-export const SET_LOADER = (state, isLoading) => {
-  state.loading = isLoading;
+export const APPEND_FLIGHTS = (state, flights) => {
+  if (!Array.isArray(flights)) return;
+
+  const combined = [...state.flights, ...flights];
+  const uniqueFlights = [];
+  const seen = new Set();
+
+  for (const f of combined) {
+    if (f && !seen.has(f.id)) {
+      seen.add(f.id);
+      uniqueFlights.push(f);
+    }
+  }
+
+  state.flights = uniqueFlights;
 };
 
+/**
+ * Catalog [Vuex Module Mutation] - Controls the content loader
+ * @param {boolean} isLoading
+ */
+export const SET_LOADER = (state, isLoading) => {
+  state.loading = !!isLoading;
+};
+
+/**
+ * Catalog [Vuex Module Mutation] - Sets pagination token for next-page requests
+ */
 export const SET_FLIGHT_PAGINATION = (state, paginationToken) => {
-  state.paginationToken = paginationToken;
+  state.paginationToken = paginationToken || null;
 };
