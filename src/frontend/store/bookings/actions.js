@@ -6,11 +6,16 @@ const BOOKINGS_API_URL = 'https://uqeubfps3l.execute-api.ap-south-1.amazonaws.co
 /**
  * Create booking via REST API
  */
-export async function createBooking({ commit }, { outboundFlight, passengers, contactInfo, userId }) {
+export async function createBooking({ commit, rootState }, { outboundFlight, passengers, contactInfo, userId }) {
   console.group("store/bookings/actions/createBooking");
   Loading.show({ message: "Creating booking..." });
 
   try {
+    // Get userId from auth store if not provided
+    if (!userId) {
+      userId = rootState.auth?.user?.id || rootState.auth?.userId;
+    }
+
     const bookingData = {
       userId: userId,
       flightId: outboundFlight.id,
@@ -61,10 +66,18 @@ export async function createBooking({ commit }, { outboundFlight, passengers, co
 /**
  * Fetch user bookings via REST API
  */
-export async function fetchBooking({ commit }, { userId }) {
-  console.group("store/bookings/actions/fetchBooking");
+export async function fetchBookings({ commit, rootState }, paginationToken = '') {
+  console.group("store/bookings/actions/fetchBookings");
   
   try {
+    // Get userId from auth store
+    const userId = rootState.auth?.user?.id || 
+                   rootState.auth?.userId;
+    
+    if (!userId) {
+      throw new Error("No user ID available. Please log in.");
+    }
+
     console.log("👤 Fetching bookings for user:", userId);
     const response = await fetch(`${BOOKINGS_API_URL}/bookings?userId=${userId}`);
     
@@ -100,10 +113,14 @@ export async function fetchBooking({ commit }, { userId }) {
 /**
  * Fetch loyalty info via REST API
  */
-export async function fetchLoyaltyInfo({ commit }, { userId }) {
+export async function fetchLoyaltyInfo({ commit, rootState }, { userId }) {
   console.group("store/bookings/actions/fetchLoyaltyInfo");
   
   try {
+    if (!userId) {
+      userId = rootState.auth?.user?.id || rootState.auth?.userId;
+    }
+
     console.log("👤 Fetching loyalty for user:", userId);
     const response = await fetch(`${BOOKINGS_API_URL}/loyalty?userId=${userId}`);
     
