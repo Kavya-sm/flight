@@ -58,7 +58,7 @@
         <q-fab-action
           color="secondary"
           icon="cancel"
-          @click="filteredFlights = flights"
+          @click="resetFilters"
           glossy
           class="filter__cta"
         />
@@ -71,7 +71,7 @@
         </div>
         <div v-if="filteredFlights.length && !loading">
           <span class="results__headline" data-test="results-headline"
-            >Select your flight</span
+            >Select your flight ({{ filteredFlights.length }} found)</span
           >
         </div>
         <div
@@ -191,7 +191,8 @@ export default {
             paginationToken: this.paginationToken
           });
 
-          this.filteredFlights = this.sortByDeparture(this.flights);
+          // Use unique flights to avoid duplicates
+          this.filteredFlights = this.sortByDeparture(this.uniqueFlights);
         }
       } catch (error) {
         console.error(error);
@@ -204,7 +205,7 @@ export default {
      * setPrice method updates maxPriceFilter and filter flights via filterByMaxPrice mixin
      */
     setPrice() {
-      let flights = this.filterByMaxPrice(this.flights, this.maxPriceFilter);
+      let flights = this.filterByMaxPrice(this.uniqueFlights, this.maxPriceFilter);
       flights = this.sortByPrice(flights);
       this.filteredFlights = flights;
     },
@@ -212,7 +213,7 @@ export default {
      * setDeparture method updates departureTimeFilter and filter flights via filterBySchedule mixin
      */
     setDeparture() {
-      let flights = this.filterBySchedule(this.flights, {
+      let flights = this.filterBySchedule(this.uniqueFlights, {
         departure: this.departureTimeFilter
       });
       flights = this.sortByDeparture(flights);
@@ -222,9 +223,18 @@ export default {
      * setArrival method updates arrivalTimeFilter and filter flights via filterBySchedule mixin
      */
     setArrival() {
-      this.filteredFlights = this.filterBySchedule(this.flights, {
+      this.filteredFlights = this.filterBySchedule(this.uniqueFlights, {
         arrival: this.arrivalTimeFilter
       });
+    },
+    /**
+     * resetFilters method clears all filters and shows original flights
+     */
+    resetFilters() {
+      this.departureTimeFilter = "";
+      this.arrivalTimeFilter = "";
+      this.maxPriceFilter = 300;
+      this.filteredFlights = this.sortByDeparture(this.uniqueFlights);
     }
   },
   /**
@@ -241,11 +251,23 @@ export default {
       paginationToken: state => state.catalog.paginationToken
     }),
     ...mapGetters("profile", ["isAuthenticated"]),
+    
+    /**
+     * Get unique flights by ID to prevent duplicates
+     */
+    uniqueFlights() {
+      return this.flights.filter((flight, index, self) => 
+        index === self.findIndex(f => f.id === flight.id)
+      );
+    },
+    
     maximumPrice: function() {
-      return Math.max(...this.flights.map(filter => filter.ticketPrice), 500);
+      const prices = this.uniqueFlights.map(filter => filter.ticketPrice);
+      return prices.length > 0 ? Math.max(...prices) : 500;
     },
     minimumPrice: function() {
-      return Math.min(...this.flights.map(filter => filter.ticketPrice), 1);
+      const prices = this.uniqueFlights.map(filter => filter.ticketPrice);
+      return prices.length > 0 ? Math.min(...prices) : 1;
     }
   }
 };
@@ -264,5 +286,4 @@ export default {
 
 .loader
   width 150%
-</style> 
-
+</style>
