@@ -4,7 +4,7 @@ import Flight from "../../shared/models/FlightClass";
  * Fetch flights for a given route from your Lambda REST API.
  * Filters duplicates, clears previous results, and updates Vuex cleanly.
  */
-export async function fetchFlights({ commit, state }, { departure, arrival }) {
+export async function fetchFlights({ commit }, { departure, arrival }) {
   console.group("store/catalog/actions/fetchFlights");
   commit("SET_LOADER", true);
 
