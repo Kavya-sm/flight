@@ -1,35 +1,29 @@
 <template>
   <q-page>
     <flight-toolbar
-      v-if="this.selectedFlight"
-      :departure="this.selectedFlight.departureAirportCode"
-      :arrival="this.selectedFlight.arrivalAirportCode"
+      v-if="selectedFlight"
+      :departure="selectedFlight.departureAirportCode"
+      :arrival="selectedFlight.arrivalAirportCode"
     />
+    
     <div class="flights">
       <div class="heading">
-        <div
-          class="q-headline text-primary text-center flight__headline"
-          data-test="flight-headline"
-        >
+        <div class="q-headline text-primary text-center flight__headline">
           Review your selection
         </div>
-        <div class="loader" v-if="loading">
-          <flight-loader></flight-loader>
-        </div>
+        <flight-loader v-if="loading" />
       </div>
-      <flight-card v-if="this.selectedFlight" :details="this.selectedFlight" />
+      <flight-card v-if="selectedFlight" :details="selectedFlight" />
     </div>
+
     <div class="form__payment">
       <div class="text-center">
-        <div
-          class="form__header q-pt-md q-headline text-primary text-center"
-          data-test="form-header"
-        >
+        <div class="form__header q-pt-md q-headline text-primary text-center">
           Payment details
         </div>
+        
         <div class="form">
           <form>
-            <input type="hidden" name="token" />
             <div class="group">
               <label for="name">
                 <span class="text-secondary">Name</span>
@@ -39,25 +33,22 @@
                   name="name"
                   placeholder="Name on card"
                   class="form__input field form__name"
-                  data-test="form-name"
                   required
                 />
               </label>
+              
               <label>
                 <span class="text-secondary">Country</span>
-                <div class="form__payment--country field">
-                  <q-select
-                    v-model="form.country"
-                    class="q-pt-sm form__select form__country"
-                    filter
-                    filter-placeholder="Country"
-                    placeholder="Country"
-                    :options="form.countryOptions"
-                    hide-underline
-                    data-test="form-country"
-                  />
-                </div>
+                <q-select
+                  v-model="form.country"
+                  class="q-pt-sm form__select form__country"
+                  filter
+                  placeholder="Country"
+                  :options="form.countryOptions"
+                  hide-underline
+                />
               </label>
+              
               <label for="postcode">
                 <span class="text-secondary">Postcode</span>
                 <input
@@ -66,64 +57,51 @@
                   name="postcode"
                   placeholder="Postcode"
                   class="form__input field form__postcode"
-                  data-test="form-postcode"
                   required
                 />
               </label>
+              
               <label>
                 <span class="text-secondary">Card number</span>
-                <div
-                  id="card-number-element"
-                  class="form__stripe field form__card"
-                ></div>
+                <div id="card-number-element" class="form__stripe field form__card"></div>
               </label>
+              
               <label>
                 <span class="text-secondary">Expiry date</span>
-                <div
-                  id="card-expiry-element"
-                  class="form__stripe field form__expiry"
-                ></div>
+                <div id="card-expiry-element" class="form__stripe field form__expiry"></div>
               </label>
+              
               <label>
                 <span class="text-secondary">CVC</span>
-                <div
-                  id="card-cvc-element"
-                  class="form__stripe field form__cvc"
-                ></div>
+                <div id="card-cvc-element" class="form__stripe field form__cvc"></div>
               </label>
             </div>
+            
             <div class="outcome">
-              <div
-                class="error text-bold text-secondary form__error"
-                data-test="form-error"
-                v-if="token.error"
-              >
+              <div class="error text-bold text-secondary form__error" v-if="token.error">
                 {{ token.error.message }}
               </div>
             </div>
           </form>
         </div>
-        <!-- Temporary debug button -->
+
+        <!-- Debug button -->
         <q-btn 
-          @click="debugAuth" 
+          @click="debugUser" 
           class="q-mt-md" 
           color="warning" 
-          label="Debug Auth Data"
+          label="Debug User Info"
           size="sm"
         />
+
         <q-btn
           @click="payment"
           class="cta__button text-weight-medium q-mt-md"
           color="secondary"
           label="Agree and pay now"
           :disable="$v.form.$invalid || form.isCardInvalid"
-          data-test="payment-button"
         >
-          <q-icon
-            class="cta__button--direction"
-            name="keyboard_arrow_right"
-            size="2.6rem"
-          />
+          <q-icon class="cta__button--direction" name="keyboard_arrow_right" size="2.6rem" />
         </q-btn>
       </div>
     </div>
@@ -131,28 +109,19 @@
 </template>
 
 <script>
-// @ts-nocheck
 import FlightCard from "../components/FlightCard";
 import FlightToolbar from "../components/FlightToolbar";
-import FlightClass from "../shared/models/FlightClass";
 import FlightLoader from "../components/FlightLoader";
 import { validationMixin } from "vuelidate";
 import { required, minLength } from "vuelidate/lib/validators";
 import { mapState, mapGetters } from "vuex";
-var stripe, card;
 
-/**
- *
- * Flight Selection view displays selected Flight chosen by customer in Flight Results view along with Payment procedure
- */
+let stripe, card;
+
 export default {
   name: "FlightSelection",
-  /**
-   * @param {Flight} flight - Selected Flight
-   * @param {string} flightId - Selected Flight Unique Identifier
-   */
   props: {
-    flight: { type: FlightClass },
+    flight: Object,
     flightId: { type: String, required: true }
   },
   components: {
@@ -163,22 +132,11 @@ export default {
   mixins: [validationMixin],
   validations: {
     form: {
-      name: {
-        required
-      },
-      country: {
-        required
-      },
-      postcode: {
-        required,
-        minLength: minLength(3)
-      }
+      name: { required },
+      country: { required },
+      postcode: { required, minLength: minLength(3) }
     }
   },
-  /**
-   * @param {boolean} isAuthenticated - Getter from Profile module
-   * @param {boolean} loading - Loader state used to control Flight Loader when fetching flights
-   */
   computed: {
     ...mapGetters({
       firstName: "profile/firstName",
@@ -186,76 +144,34 @@ export default {
       isAuthenticated: "profile/isAuthenticated"
     }),
     ...mapState({
-      loading: state => state.catalog.loading
+      loading: state => state.catalog.loading,
+      profile: state => state.profile
     })
   },
   async beforeMount() {
-    /** authentication guards prevent authenticated users to view Flights
-     * however, the component doesn't stop from rendering asynchronously
-     * this guarantees we attempt talking to Catalog service
-     * if our authentication guards && profile module have an user in place
-     */
-    if (this.isAuthenticated) {
-      if (!this.flight) {
-        this.selectedFlight = await this.$store.dispatch(
-          "catalog/fetchByFlightId",
-          {
-            flightId: this.flightId
-          }
-        );
-      }
+    if (this.isAuthenticated && !this.flight) {
+      this.selectedFlight = await this.$store.dispatch("catalog/fetchByFlightId", {
+        flightId: this.flightId
+      });
     }
   },
   mounted() {
-    /**
-     * Stripe JS is loaded into the DOM asynchronously
-     * once loaded we attach Stripe Elements to custom DOM elements
-     * that makes payment credit card collection seamless through iFrame while providing an unified experience
-     */
-    console.log("🔐 Auth store on mount:", this.$store.state.auth);
-    console.log("👤 Customer data on mount:", this.customer);
-    
-    let stripeElements = this.loadStripeJS();
-    stripeElements
+    this.loadStripeJS()
       .then(() => this.loadStripeElements())
-      .catch(err => console.error(err));
+      .catch(console.error);
   },
-  /**
-   * @param {object} token - Stripe JS token object
-   * @param {object} token.details - Stripe JS tokenized details
-   * @param {object} token.error - Stripe JS error when attempting tokenization
-   * @param {string} stripeKey - Public Stripe JS key for tokenization
-   * @param {object} form - Form object holding some information and validation hooks
-   * @param {string} form.name - Given contact name
-   * @param {string} form.country - Given contact country
-   * @param {object} form.countryOptions - List of countries we accept payment from
-   * @param {boolean} isCardInvalid - Boolean updated through Stripe Elements events upon input
-   * @param {Flight} selectedFlight - Selected Flight
-   */
   data() {
     return {
-      token: {
-        details: "",
-        error: ""
-      },
-      stripeKey: process.env.VUE_APP_StripePublicKey || "no Stripe public key",
+      token: { details: "", error: "" },
+      stripeKey: process.env.VUE_APP_StripePublicKey || "pk_test_your_key",
       form: {
         name: "",
         country: "",
         postcode: "",
         countryOptions: [
-          {
-            label: "Brazil",
-            value: "BR"
-          },
-          {
-            label: "United Kingdom",
-            value: "UK"
-          },
-          {
-            label: "United States",
-            value: "US"
-          }
+          { label: "Brazil", value: "BR" },
+          { label: "United Kingdom", value: "UK" },
+          { label: "United States", value: "US" }
         ],
         isCardInvalid: true
       },
@@ -263,91 +179,63 @@ export default {
     };
   },
   methods: {
-    /**
-     * Debug method to check auth structure
-     */
-    debugAuth() {
-      console.group("🐛 DEBUG Auth Structure");
-      console.log("Full auth store:", this.$store.state.auth);
-      console.log("Auth user object:", this.$store.state.auth.user);
+    debugUser() {
+      console.group("USER DEBUG INFO");
+      console.log("Profile store:", this.profile);
+      console.log("Profile user:", this.profile?.user);
       console.log("Customer getter:", this.customer);
-      console.log("First name getter:", this.firstName);
+      console.log("First name:", this.firstName);
+      console.log("Is authenticated:", this.isAuthenticated);
       
-      // Test all possible user ID locations
-      const possibleUserIds = {
-        'auth.user.id': this.$store.state.auth.user?.id,
-        'auth.userId': this.$store.state.auth.userId,
-        'auth.user.sub': this.$store.state.auth.user?.sub,
-        'auth.user.username': this.$store.state.auth.user?.username,
-        'auth.attributes.sub': this.$store.state.auth.attributes?.sub
-      };
-      
-      console.log("Possible User IDs:", possibleUserIds);
-      
-      // Find the first truthy value
-      const userId = Object.values(possibleUserIds).find(val => val);
-      console.log("First valid User ID:", userId);
-      
+      // Show available user IDs
+      const user = this.profile?.user;
+      console.log("Available user IDs:", {
+        id: user?.id,
+        sub: user?.sub,
+        username: user?.username,
+        email: user?.email
+      });
       console.groupEnd();
     },
 
-    /**
-     * Tokenize form and credit card data, and make charge request against Payment service
-     * Given a successful payment it attempts to create a booking with Booking service
-     * If booking completes successfuly, it redirects the customer to the Bookings view
-     */
     async payment() {
-      let options = {
+      const options = {
         name: this.form.name,
         address_zip: this.form.postcode,
         address_country: this.form.country
       };
 
       try {
+        // Create Stripe token
         const { token, error } = await stripe.createToken(card, options);
         this.token.details = token;
         this.token.error = error;
 
-        if (this.token.error) throw this.token.error;
+        if (error) throw error;
 
-        // DEBUG: Check what data we have
-        console.log("🔐 Auth store:", this.$store.state.auth);
-        console.log("👤 Customer data:", this.customer);
-        console.log("👤 First name:", this.firstName);
-
-        // Get userId from auth store
-        const userId = this.$store.state.auth.user?.id || 
-                       this.$store.state.auth.userId ||
-                       this.$store.state.auth.user?.sub ||
-                       this.$store.state.auth.user?.username;
-
-        console.log("🆔 Extracted userId:", userId);
+        // Get user data
+        const user = this.profile?.user;
+        const userId = user?.id || user?.sub || user?.username;
 
         if (!userId) {
-          throw new Error("User not authenticated. Please log in.");
+          throw new Error("Please log in to create a booking");
         }
 
-        // Create passengers array from form data
+        console.log("Creating booking for user:", userId);
+
+        // Prepare booking data
         const passengers = [{
-          name: this.form.name || 'Passenger',
-          email: this.customer?.email || this.form.name + '@example.com'
+          name: this.form.name || this.firstName || "Passenger",
+          email: user?.email || this.customer?.email || "user@example.com"
         }];
 
-        // Create contact info from form data
         const contactInfo = {
-          email: this.customer?.email || this.form.name + '@example.com',
-          phone: this.customer?.phone_number || '+1234567890',
-          name: this.form.name
+          email: user?.email || this.customer?.email || "user@example.com",
+          phone: user?.phone_number || this.customer?.phone_number || "",
+          name: this.form.name || this.firstName || "Passenger"
         };
 
-        console.log("📤 Booking data being sent:", {
-          userId,
-          passengers,
-          contactInfo,
-          outboundFlight: this.selectedFlight
-        });
-
-        // Call createBooking with ALL required parameters
+        // Create booking
         await this.$store.dispatch("bookings/createBooking", {
           paymentToken: this.token,
           outboundFlight: this.selectedFlight,
@@ -356,95 +244,71 @@ export default {
           contactInfo: contactInfo
         });
 
-        // eslint-disable-next-line
+        // Success
         this.$q.loading.show({
-          message: `Your booking is being processed - We'll soon contact you via ${contactInfo.email}.`
+          message: "Booking confirmed! Redirecting..."
         });
-        
+
         setTimeout(() => {
           this.$q.loading.hide();
           this.$router.push({ name: "bookings" });
-        }, 3000);
-        
+        }, 2000);
+
       } catch (err) {
         this.$q.loading.hide();
-        console.error("❌ Payment error:", err);
+        console.error("Payment error:", err);
         this.$q.notify({
-          type: 'negative',
-          message: `Error creating booking: ${err.message}`,
+          type: "negative",
+          message: `Booking failed: ${err.message}`,
           timeout: 5000
         });
       }
     },
-    /**
-     * Injects Stripe JS library asynchronously into the DOM
-     */
+
     loadStripeJS() {
       return new Promise((resolve, reject) => {
-        let stripeScript = document.createElement("script");
-        stripeScript.async = true;
-        stripeScript.src = "https://js.stripe.com/v3/";
-        stripeScript.addEventListener("load", resolve);
-        stripeScript.addEventListener("error", () =>
-          reject("Error loading Stripe Elements.")
-        );
-        stripeScript.addEventListener("abort", () =>
-          reject("Stripe Elements loading aborted.")
-        );
-        document.head.appendChild(stripeScript);
+        if (window.Stripe) {
+          resolve();
+          return;
+        }
+
+        const script = document.createElement("script");
+        script.src = "https://js.stripe.com/v3/";
+        script.onload = resolve;
+        script.onerror = () => reject("Failed to load Stripe");
+        document.head.appendChild(script);
       });
     },
-    /**
-     * Provides customer feedback upon Stripe Elements card data validation
-     */
-    updateCardFeedback(result) {
-      this.token.error = result.error;
-      this.form.isCardInvalid = !result.complete;
-    },
-    /**
-     * Once Stripe JS is loaded it attaches Stripe Elements to existing DOM elements
-     * It also customizes Stripe Elements UI to provide a consistent experience
-     */
-    loadStripeElements() {
-      stripe = Stripe(this.stripeKey); // eslint-disable-line
-      let elements = stripe.elements();
-      let style = {
-        base: {
-          iconColor: "#666EE8",
-          color: "#31325F",
-          lineHeight: "40px",
-          fontWeight: 300,
-          fontFamily: "Helvetica Neue",
-          fontSize: "15px",
 
-          "::placeholder": {
-            color: "#CFD7E0"
-          }
+    updateCardFeedback(event) {
+      this.token.error = event.error;
+      this.form.isCardInvalid = !event.complete;
+    },
+
+    loadStripeElements() {
+      stripe = window.Stripe(this.stripeKey);
+      const elements = stripe.elements();
+      const style = {
+        base: {
+          color: "#31325F",
+          fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+          fontSmoothing: "antialiased",
+          fontSize: "16px",
+          "::placeholder": { color: "#CFD7E0" }
         }
       };
 
-      card = elements.create("cardNumber", {
-        style: style
-      });
+      card = elements.create("cardNumber", { style });
+      const cardExpiry = elements.create("cardExpiry", { style });
+      const cardCvc = elements.create("cardCvc", { style });
 
-      var cardExpiryElement = elements.create("cardExpiry", {
-        style: style
-      });
-
-      var cardCvcElement = elements.create("cardCvc", {
-        style: style
-      });
-
-      // Enable Stripe iFrame on each field
       card.mount("#card-number-element");
-      cardExpiryElement.mount("#card-expiry-element");
-      cardCvcElement.mount("#card-cvc-element");
+      cardExpiry.mount("#card-expiry-element");
+      cardCvc.mount("#card-cvc-element");
 
-      // Stripe Elements emit events upon card validation
-      // Capture it and provide feedback to customer
-      card.on("change", event => this.updateCardFeedback(event));
-      cardExpiryElement.on("change", event => this.updateCardFeedback(event));
-      cardCvcElement.on("change", event => this.updateCardFeedback(event));
+      card.on("change", this.updateCardFeedback);
+      cardExpiry.on("change", this.updateCardFeedback);
+      cardCvc.on("change", this.updateCardFeedback);
     }
   }
 };
@@ -501,9 +365,6 @@ label > span
 .field::-webkit-input-placeholder
   color #CFD7E0
 
-.field::-moz-placeholder
-  color #CFD7E0
-
 .outcome
   float left
   width 100%
@@ -513,13 +374,5 @@ label > span
 
 .error
   font-size 20px
-
-.error.visible
-  display inline
-
-.separator
-  box-shadow 0 7px 14px 0 rgba(49, 49, 93, 0.1), 0 3px 6px 0 rgba(0, 0, 0, 0.08)
-
-.loader
-  width 150%
 </style>
+
