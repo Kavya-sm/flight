@@ -1,44 +1,58 @@
+// store/catalog/actions.js
 import Flight from "../../shared/models/FlightClass";
 
-/**
- * Catalog [Vuex Module Action](https://vuex.vuejs.org/guide/actions.html) - fetchFlights retrieves all flights for a given date, departure and arrival from Catalog service.
- *
- * It uses SET_FLIGHTS mutation to update Catalog state with the latest flights.
- *
- * It also controls Flight Loader when fetching data from Catalog service.
- * @param {object} context - Vuex action context (context.commit, context.getters, context.state, context.dispatch)
- * @param {object} obj - Object containing params to filter flights from catalog
- * @param {Date} obj.date - Date in DD-MM-YYYY format
- * @param {string} obj.departure - Airport IATA to be filtered as departure
- * @param {string} obj.arrival - Airport IATA to be filtered as arrival
- * @param {string} obj.paginationToken - pagination token for loading additional flights
- * @returns {promise} - Promise representing whether flights from Catalog have been updated in the store
- * @see {@link SET_FLIGHTS} for more info on mutation
- * @see {@link SET_LOADER} for more info on mutation
- */
-export async function fetchFlights({ commit }, { departure, arrival }) {
+export async function fetchFlights({ commit }, { date, departure, arrival, paginationToken = null }) {
   console.group("store/catalog/actions/fetchFlights");
   commit("SET_LOADER", true);
 
   try {
-    console.log("Fetching flight data via REST API");
+    console.log("Fetching flight data via REST API for:", { departure, arrival, date });
 
-    const response = await fetch(
-      `https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/search?from=${departure}&to=${arrival}`
+    // Build URL with all parameters - ensure cities are uppercase
+    const departureUpper = departure.toUpperCase();
+    const arrivalUpper = arrival.toUpperCase();
+    
+    const url = `https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/search?from=${departureUpper}&to=${arrivalUpper}`;
+
+    console.log("API URL:", url);
+
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log("Raw API response:", data);
+    
+    let flightsData;
+    if (typeof data.body === 'string') {
+      flightsData = JSON.parse(data.body);
+    } else {
+      flightsData = data.body || data;
+    }
+
+    // Ensure it's an array
+    if (!Array.isArray(flightsData)) {
+      flightsData = [flightsData];
+    }
+
+    console.log("Processed flights data:", flightsData);
+
+    // Remove duplicates by flight ID before creating Flight objects
+    const uniqueFlightsData = flightsData.filter((flight, index, self) => 
+      index === self.findIndex(f => f.id === flight.id)
     );
 
-    const data = await response.json();
-    const flightsData = JSON.parse(data.body);
-
-    const flights = flightsData.map(flightData =>
+    const flights = uniqueFlightsData.map(flightData =>
       new Flight({
         id: flightData.id,
         departureDate: flightData.departure,
         departureAirportCode: flightData.from,
-        departureAirportName: flightData.from,
+        departureAirportName: flightData.from, // You might want to map this to actual airport names
         arrivalDate: flightData.arrival,
         arrivalAirportCode: flightData.to,
-        arrivalAirportName: flightData.to,
+        arrivalAirportName: flightData.to, // You might want to map this to actual airport names
         ticketPrice: flightData.price,
         ticketCurrency: "EUR",
         flightNumber: flightData.id,
@@ -46,30 +60,21 @@ export async function fetchFlights({ commit }, { departure, arrival }) {
       })
     );
 
-    console.log(flights);
+    console.log("Final unique flights:", flights);
     commit("SET_FLIGHTS", flights);
-    commit("SET_FLIGHT_PAGINATION", null);
+    commit("SET_FLIGHT_PAGINATION", paginationToken);
     commit("SET_LOADER", false);
     console.groupEnd();
+    
+    return flights;
   } catch (error) {
     commit("SET_LOADER", false);
-    console.error(error);
+    console.error("Error fetching flights:", error);
+    this.$q?.notify?.(`Error fetching flights: ${error.message}`);
     throw new Error(error);
   }
 }
 
-/**
- * Catalog [Vuex Module Action](https://vuex.vuejs.org/guide/actions.html) - fetchByFlightId retrieves a unique flight from Catalog service. Flight Number may be reused but not ID.
- *
- * Similarly to fetchFlights, it also controls Flight Loader when fetching data from Catalog service.
- *
- * **NOTE**: It doesn't mutate the store
- * @param {object} context - Vuex action context (context.commit, context.getters, context.state, context.dispatch)
- * @param {object} obj - Object containing params to filter flights from catalog
- * @param {string} obj.flightId - Flight Unique Identifier
- * @returns {promise} - Promise representing flight from Catalog service.
- * @see {@link SET_LOADER} for more info on mutation
- */
 export async function fetchByFlightId({ commit }, { flightId }) {
   try {
     console.group("store/catalog/actions/fetchByFlightId");
@@ -78,6 +83,10 @@ export async function fetchByFlightId({ commit }, { flightId }) {
     const response = await fetch(
       "https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/search"
     );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
     const data = await response.json();
     const flightsData = JSON.parse(data.body);
@@ -112,6 +121,5 @@ export async function fetchByFlightId({ commit }, { flightId }) {
     throw error;
   }
 }
-
 
 
