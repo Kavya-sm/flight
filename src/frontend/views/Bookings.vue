@@ -79,10 +79,8 @@ export default {
      */
     async loadBookings() {
       try {
-        await this.$store.dispatch(
-          "bookings/fetchBookings",  // Changed from fetchBooking to fetchBookings
-          this.paginationToken
-        );
+        // Removed paginationToken parameter since it's not used in the action
+        await this.$store.dispatch("bookings/fetchBookings");
       } catch (error) {
         console.error(error);
         this.$q.notify(
@@ -122,6 +120,7 @@ export default {
   }
 };
 </script>
+
 <style lang="stylus">
 @import '~variables'
 
