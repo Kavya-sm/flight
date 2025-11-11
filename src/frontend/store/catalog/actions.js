@@ -46,20 +46,40 @@ const actions = {
     commit("SET_LOADER", true);
 
     try {
-      console.log(`Fetching flight data for ${departure} → ${arrival}`);
+      console.log(`✈️ Fetching flight data for ${departure} → ${arrival}`);
 
-      // Backend currently ignores params, so fetch all
+      // Fetch from backend (which returns JSON body as string or array)
       const response = await fetch(
         "https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/search"
       );
       const data = await response.json();
-      const flightsData = JSON.parse(data.body);
 
-      // ✅ Filter only flights matching requested route
-      const filteredFlightsData = flightsData.filter(
-        flight =>
-          flight.from?.toLowerCase() === departure?.toLowerCase() &&
-          flight.to?.toLowerCase() === arrival?.toLowerCase()
+      // ✅ Safely handle both stringified or parsed response bodies
+      let flightsData = [];
+      if (typeof data.body === "string") {
+        flightsData = JSON.parse(data.body);
+      } else if (Array.isArray(data.body)) {
+        flightsData = data.body;
+      } else if (Array.isArray(data)) {
+        flightsData = data;
+      } else {
+        flightsData = [];
+      }
+
+      console.log("✅ Flights fetched:", flightsData.length);
+      console.log("🔹 Sample flight:", flightsData[0]);
+
+      // ✅ Flexible filter (matches both 'DEL'/'Delhi' cases)
+      const filteredFlightsData = flightsData.filter(flight => {
+        const from = flight.from?.trim().toLowerCase() || "";
+        const to = flight.to?.trim().toLowerCase() || "";
+        const dep = departure?.trim().toLowerCase() || "";
+        const arr = arrival?.trim().toLowerCase() || "";
+        return from.includes(dep) && to.includes(arr);
+      });
+
+      console.log(
+        `✅ Filtered ${filteredFlightsData.length} flights for ${departure} → ${arrival}`
       );
 
       // ✅ Convert to Flight class instances
@@ -79,7 +99,7 @@ const actions = {
         })
       );
 
-      // ✅ Replace flight list completely (no duplicates)
+      // ✅ Replace or append depending on pagination
       if (!paginationToken) {
         commit("SET_FLIGHTS", flights);
       } else {
@@ -88,7 +108,7 @@ const actions = {
 
       commit("SET_FLIGHT_PAGINATION", null);
     } catch (error) {
-      console.error("Error fetching flights:", error);
+      console.error("❌ Error fetching flights:", error);
       throw error;
     } finally {
       commit("SET_LOADER", false);
@@ -108,7 +128,16 @@ const actions = {
         "https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/search"
       );
       const data = await response.json();
-      const flightsData = JSON.parse(data.body);
+
+      // ✅ Safe parsing again
+      let flightsData = [];
+      if (typeof data.body === "string") {
+        flightsData = JSON.parse(data.body);
+      } else if (Array.isArray(data.body)) {
+        flightsData = data.body;
+      } else {
+        flightsData = data || [];
+      }
 
       // ✅ Find exact flight by ID
       const flightData = flightsData.find(flight => flight.id === flightId);
@@ -128,10 +157,10 @@ const actions = {
         seatCapacity: flightData.seats || 100
       });
 
-      console.log("Fetched Flight by ID:", flight);
+      console.log("✅ Fetched Flight by ID:", flight);
       return flight;
     } catch (error) {
-      console.error("Error fetching flight by ID:", error);
+      console.error("❌ Error fetching flight by ID:", error);
       throw error;
     } finally {
       commit("SET_LOADER", false);
@@ -148,4 +177,5 @@ export default {
   mutations,
   actions
 };
+
 
