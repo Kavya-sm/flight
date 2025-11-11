@@ -140,12 +140,6 @@ export default {
   },
   data() {
     return {
-      /**
-       * @param {object} departureCity - Departure city chosen by the customer
-       * @param {object} arrivalCity - Arrival city chosen by the customer
-       * @param {object} departureDate - Departure date chosen by the customer
-       * @param {object} suggestionList - Parsed list of airports offered as auto-suggestion
-       */
       departureCity: "",
       arrivalCity: "",
       departureDate: new Date(),
@@ -153,9 +147,6 @@ export default {
     };
   },
   methods: {
-    /**
-     * search method collects form data, create queryStrings, and redirects to Search Results view
-     */
     search() {
       this.$router.push({
         name: "searchResults",
@@ -166,9 +157,6 @@ export default {
         }
       });
     },
-    /**
-     * fuzzySearchFilter method uses Fuse library to easily find airports whether that is city, IATA, initials, etc.
-     */
     fuzzySearchFilter(terms, { field, list }) {
       const token = terms.toLowerCase();
       var options = {
@@ -196,5 +184,6 @@ export default {
   max-width 30rem
   margin auto
 </style>
+
 
 
