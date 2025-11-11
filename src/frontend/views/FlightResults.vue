@@ -5,6 +5,7 @@
       :departure="departure"
       :arrival="arrival"
     />
+
     <q-page-sticky
       v-if="date && departure && arrival"
       position="top-right"
@@ -29,6 +30,7 @@
             />
           </q-popup-edit>
         </q-fab-action>
+
         <q-fab-action color="secondary" icon="schedule" glossy>
           <q-popup-edit title="Schedule filter">
             <q-datetime
@@ -55,6 +57,7 @@
             />
           </q-popup-edit>
         </q-fab-action>
+
         <q-fab-action
           color="secondary"
           icon="cancel"
@@ -64,16 +67,20 @@
         />
       </q-fab>
     </q-page-sticky>
+
+    <!-- 🧭 Header Section -->
     <div class="heading">
       <div class="q-headline text-primary text-center">
         <div class="loader" v-if="loading">
           <flight-loader></flight-loader>
         </div>
+
         <div v-if="filteredFlights.length && !loading">
-          <span class="results__headline" data-test="results-headline"
-            >Select your flight</span
-          >
+          <span class="results__headline" data-test="results-headline">
+            Select your flight
+          </span>
         </div>
+
         <div
           v-if="!filteredFlights.length && !loading"
           class="heading__error row"
@@ -81,8 +88,9 @@
           <span
             class="justify-center full-width results__error"
             data-test="results-error"
-            >No results found</span
           >
+            No results found
+          </span>
           <transition enter-active-class="animated bounce" appear>
             <q-btn
               class="cta__button heading__error--cta"
@@ -90,25 +98,28 @@
               label="Search flights"
               icon="keyboard_arrow_left"
               :to="{ name: 'home' }"
-            >
-            </q-btn>
+            />
           </transition>
         </div>
       </div>
     </div>
+
+    <!-- 🧳 Flight Cards -->
     <div class="results__flights" v-if="filteredFlights.length && !loading">
       <router-link
+        v-for="flight in filteredFlights"
+        :key="flight.id"
         :to="{
           name: 'selectedFlight',
           params: { flight: flight },
           query: { flightId: flight.id }
         }"
-        v-for="flight in filteredFlights"
-        :key="flight.id"
       >
         <flight-card :details="flight" />
       </router-link>
     </div>
+
+    <!-- Pagination -->
     <div class="wrapper">
       <q-btn
         v-if="paginationToken"
@@ -143,22 +154,11 @@ export default {
     FlightLoader
   },
   mixins: [priceFilter, scheduleFilter, priceSorter, scheduleSorter],
-  /**
-   * @param {string} date - Departure date one wishes to travel by
-   * @param {string} departure - Departure airport IATA one wishes to travel from
-   * @param {string} arrival - Arrival airport IATA one wishes to travel to
-   */
   props: {
     date: { type: String, required: true },
     departure: { type: String, required: true },
     arrival: { type: String, required: true }
   },
-  /**
-   * @param {Flight[]} filteredFlights - List of Flights filtered by departure, price or schedule
-   * @param {string} departureTimeFilter - Departure schedule one wishes to filter flights by
-   * @param {string} arrivalTimeFilter - Arrival schedule one wishes to filter flights by
-   * @param {string} maxPriceFilter - Maximum price one wishes to limit flights to
-   */
   data() {
     return {
       filteredFlights: [],
@@ -168,48 +168,46 @@ export default {
     };
   },
   mounted() {
-    /** authentication guards prevent authenticated users to view Flights
-     * however, the component doesn't stop from rendering asynchronously
-     * this guarantees we attempt talking to Catalog service
-     * if our authentication guards && profile module have an user in place
-     */
-  //  if (this.isAuthenticated) {
-      this.loadFlights();
-   // }
+    // ✅ Always load flights (don’t depend on authentication)
+    this.loadFlights();
   },
   methods: {
     /**
-     * loadFlights method fetches all flights via catalog API
+     * Load flights from Vuex (Lambda backend)
      */
     async loadFlights() {
       try {
-        if (this.isAuthenticated) {
-          await this.$store.dispatch("catalog/fetchFlights", {
-            date: this.date,
-            departure: this.departure,
-            arrival: this.arrival,
-            paginationToken: this.paginationToken
-          });
+        console.log("🟢 Loading flights for:", this.departure, "→", this.arrival);
 
-          this.filteredFlights = this.sortByDeparture(this.flights);
-        }
+        await this.$store.dispatch("catalog/fetchFlights", {
+          date: this.date,
+          departure: this.departure,
+          arrival: this.arrival,
+          paginationToken: this.paginationToken
+        });
+
+        // ✅ Assign flights directly from store
+        this.filteredFlights = this.flights;
+        console.log("🟢 Flights loaded:", this.filteredFlights);
       } catch (error) {
-        console.error(error);
+        console.error("❌ Error loading flights:", error);
         this.$q.notify(
           `Error while fetching Flight results - Check browser console messages`
         );
       }
     },
+
     /**
-     * setPrice method updates maxPriceFilter and filter flights via filterByMaxPrice mixin
+     * Filter flights by max price
      */
     setPrice() {
       let flights = this.filterByMaxPrice(this.flights, this.maxPriceFilter);
       flights = this.sortByPrice(flights);
       this.filteredFlights = flights;
     },
+
     /**
-     * setDeparture method updates departureTimeFilter and filter flights via filterBySchedule mixin
+     * Filter by departure schedule
      */
     setDeparture() {
       let flights = this.filterBySchedule(this.flights, {
@@ -218,8 +216,9 @@ export default {
       flights = this.sortByDeparture(flights);
       this.filteredFlights = flights;
     },
+
     /**
-     * setArrival method updates arrivalTimeFilter and filter flights via filterBySchedule mixin
+     * Filter by arrival schedule
      */
     setArrival() {
       this.filteredFlights = this.filterBySchedule(this.flights, {
@@ -227,13 +226,7 @@ export default {
       });
     }
   },
-  /**
-   * @param {Flight} flights - Flights state from Flights module
-   * @param {boolean} loading - Loader state used to control Flight Loader when fetching flights
-   * @param {boolean} isAuthenticated - Getter from Profile module
-   * @param {number} maximumPrice - Maximum ticket price calculated across all available flights
-   * @param {number} minimumPrice - Minimum ticket price calculated across all available flights
-   */
+
   computed: {
     ...mapState({
       flights: state => state.catalog.flights,
@@ -241,11 +234,13 @@ export default {
       paginationToken: state => state.catalog.paginationToken
     }),
     ...mapGetters("profile", ["isAuthenticated"]),
-    maximumPrice: function() {
-      return Math.max(...this.flights.map(filter => filter.ticketPrice), 500);
+    maximumPrice() {
+      if (!this.flights.length) return 500;
+      return Math.max(...this.flights.map(f => f.ticketPrice), 500);
     },
-    minimumPrice: function() {
-      return Math.min(...this.flights.map(filter => filter.ticketPrice), 1);
+    minimumPrice() {
+      if (!this.flights.length) return 1;
+      return Math.min(...this.flights.map(f => f.ticketPrice), 1);
     }
   }
 };
@@ -265,3 +260,4 @@ export default {
 .loader
   width 150%
 </style>
+
