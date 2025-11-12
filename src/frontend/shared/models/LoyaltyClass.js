@@ -1,25 +1,44 @@
-/** Class representing Loyalty. All permutations of data from Loyalty, a different date format for instance, should happen here. */
+/** Class representing Loyalty data model */
 export default class Loyalty {
   /**
    * Creates an instance of Loyalty.
-   * @param {Object} Loyalty
-   * @param {string} Loyalty.level - Loyalty Tier Level
-   * @param {number} Loyalty.points - Sum of Loyalty points accumulated
-   * @param {number} Loyalty.remainingPoints - Remaining Loyalty points to reach next tier level
-   * @example
-   * let loyalty = new Loyalty({
-   *    level: "purple",
-   *    points: 324567,
-   *    remainingPoints: 32456,
-   *    customer: "3fe22b2c-2b52-4a75-9db7-6cfc36a0cfcd"
-   * })
+   * @param {Object} loyaltyData
+   * @param {string} loyaltyData.level - Loyalty Tier Level
+   * @param {number} loyaltyData.points - Sum of Loyalty points accumulated
+   * @param {number} loyaltyData.remainingPoints - Remaining points to reach next tier
+   * @param {number} loyaltyData.percentage - Progress percentage to next tier
    */
-  constructor({ level, points, remainingPoints }) {
-    this.level = level;
-    this.points = points;
-    this.remainingPoints = remainingPoints;
+  constructor({ level, points, remainingPoints, percentage, userId, createdAt, updatedAt }) {
+    this.level = level || 'bronze';
+    this.points = points || 0;
+    this.remainingPoints = remainingPoints || 1000;
+    this.percentage = percentage || this.calculatePercentage();
+    this.userId = userId;
+    this.createdAt = createdAt;
+    this.updatedAt = updatedAt;
+  }
 
-    this.percentage =
-      Math.ceil((points / (points + remainingPoints)) * 100) || 0;
+  /**
+   * Calculate progress percentage to next tier
+   */
+  calculatePercentage() {
+    if (this.points === 0 || this.remainingPoints === 0) return 0;
+    
+    const totalPointsForNextTier = this.points + this.remainingPoints;
+    return Math.ceil((this.points / totalPointsForNextTier) * 100);
+  }
+
+  /**
+   * Get formatted level name (e.g., "Bronze" instead of "bronze")
+   */
+  getFormattedLevel() {
+    return this.level.charAt(0).toUpperCase() + this.level.slice(1);
+  }
+
+  /**
+   * Check if user has reached maximum tier
+   */
+  isMaxTier() {
+    return this.level === 'platinum' && this.remainingPoints === 0;
   }
 }
