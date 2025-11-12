@@ -6,14 +6,14 @@
       </div>
     </div>
 
-    <!-- Debug button to help see the data -->
-    <div class="wrapper text-center q-mb-md">
+    <!-- Debug button -->
+    <div class="wrapper text-center">
       <q-btn 
         @click="debugBookings" 
         label="Debug Bookings Data" 
         color="warning" 
+        class="q-mb-md" 
         size="sm"
-        class="q-mb-md"
       />
     </div>
     
@@ -30,10 +30,42 @@
                 Flight details loading...
               </span>
             </h5>
-            <booking-flight
+            <!-- Remove BookingFlight component if it's causing duplicates -->
+            <!-- <booking-flight
               :bookingID="booking.bookingID"
               :flight="booking.flight"
-            />
+            /> -->
+            
+            <!-- Instead, show simple flight details -->
+            <div class="booking-details q-pa-md">
+              <div class="row items-center">
+                <div class="col-6 text-center">
+                  <div class="text-h4 text-primary">{{ booking.flight.departureAirportCode }}</div>
+                  <div class="text-caption">{{ booking.flight.departureAirportName || 'Departure' }}</div>
+                  <div class="text-caption text-weight-medium">{{ formatTime(booking.flight.departureDate) }}</div>
+                </div>
+                <div class="col-6 text-center">
+                  <div class="text-h4 text-primary">{{ booking.flight.arrivalAirportCode }}</div>
+                  <div class="text-caption">{{ booking.flight.arrivalAirportName || 'Arrival' }}</div>
+                  <div class="text-caption text-weight-medium">{{ formatTime(booking.flight.arrivalDate) }}</div>
+                </div>
+              </div>
+              <div class="row justify-center q-mt-sm">
+                <div class="text-caption text-grey">
+                  Flight {{ booking.flight.flightNumber }} • 
+                  {{ booking.flight.duration || 'Duration not available' }}
+                </div>
+              </div>
+              <div class="row justify-center q-mt-sm">
+                <q-btn 
+                  label="View Details" 
+                  color="primary" 
+                  size="sm" 
+                  outline
+                  @click="viewBookingDetails(booking)"
+                />
+              </div>
+            </div>
           </q-timeline-entry>
         </div>
       </q-timeline>
@@ -48,16 +80,20 @@
 </template>
 
 <script>
-import BookingFlight from "../components/BookingFlight";
+// import BookingFlight from "../components/BookingFlight"; // Remove this import
 import { mapState, mapGetters } from "vuex";
 
 export default {
   name: "Bookings",
-  components: { BookingFlight },
+  components: { 
+    // BookingFlight // Remove this component
+  },
   
   mounted() {
     if (this.isAuthenticated) {
-      this.loadBookings();
+      this.loadBookings().then(() => {
+        this.debugBookings();
+      });
     }
   },
   
@@ -89,25 +125,45 @@ export default {
       }
     },
 
-    // Debug method to see the actual data structure
+    formatTime(dateString) {
+      if (!dateString) return '--:--';
+      try {
+        return new Date(dateString).toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false
+        });
+      } catch (e) {
+        return '--:--';
+      }
+    },
+
+    viewBookingDetails(booking) {
+      console.log('Booking details:', booking);
+      this.$q.notify({
+        message: `Booking ${booking.bookingID} details`,
+        color: 'info',
+        timeout: 2000
+      });
+    },
+
     debugBookings() {
-      console.group("🔍 BOOKINGS DEBUG INFO");
-      console.log("Raw bookings from Vuex:", this.bookings);
-      if (this.bookings && this.bookings.length > 0) {
-        console.log("First booking raw data:", this.bookings[0]);
+      console.group("📦 BOOKINGS DEBUG INFO");
+      console.log("All bookings raw data:", this.bookings);
+      if (this.bookings.length > 0) {
+        console.log("First booking details:", this.bookings[0]);
         console.log("First booking outboundFlight:", this.bookings[0].outboundFlight);
         console.log("First booking normalized:", this.normalizedBookings[0]);
-      } else {
-        console.log("No bookings found");
       }
       console.groupEnd();
-
-      // Show notification with basic info
-      this.$q.notify({
-        message: `Found ${this.bookings.length} booking(s) - check console for details`,
-        color: 'info',
-        timeout: 4000
-      });
+      
+      if (this.bookings.length > 0) {
+        this.$q.notify({
+          message: `Found ${this.bookings.length} booking(s). Check console for details.`,
+          color: 'info',
+          timeout: 4000
+        });
+      }
     }
   },
   
@@ -116,48 +172,28 @@ export default {
       bookings: state => state.bookings.bookings
     }),
     ...mapGetters("profile", ["isAuthenticated"]),
-
-    // Normalize the booking data to match what the template expects
+    
     normalizedBookings() {
-      if (!this.bookings || !Array.isArray(this.bookings)) {
-        return [];
-      }
-
       return this.bookings.map(booking => {
-        // The API returns flight data in outboundFlight, but template expects it in flight
         const outboundFlight = booking.outboundFlight || {};
+        const departureAirport = outboundFlight.departureAirport || {};
+        const arrivalAirport = outboundFlight.arrivalAirport || {};
         
         return {
-          // Keep the original booking ID
           id: booking.id,
           bookingID: booking.bookingReference || booking.id,
-          
-          // Transform the flight data to match what BookingFlight component expects
           flight: {
-            // Airport codes - handle both nested and flat structures
-            departureAirportCode: outboundFlight.departureAirport?.code || 
-                                outboundFlight.departureAirportCode || 
-                                'Unknown',
-            arrivalAirportCode: outboundFlight.arrivalAirport?.code || 
-                              outboundFlight.arrivalAirportCode || 
-                              'Unknown',
-            
-            // Dates
-            departureDate: outboundFlight.departureTime || 
-                          outboundFlight.departureDate,
-            arrivalDate: outboundFlight.arrivalTime || 
-                        outboundFlight.arrivalDate,
-            
-            // Other flight details that might be needed
+            departureAirportCode: departureAirport.code || outboundFlight.departureAirportCode || 'Unknown',
+            arrivalAirportCode: arrivalAirport.code || outboundFlight.arrivalAirportCode || 'Unknown',
+            departureAirportName: departureAirport.name || outboundFlight.departureAirportName,
+            arrivalAirportName: arrivalAirport.name || outboundFlight.arrivalAirportName,
+            departureDate: outboundFlight.departureTime || outboundFlight.departureDate,
+            arrivalDate: outboundFlight.arrivalTime || outboundFlight.arrivalDate,
             flightNumber: outboundFlight.flightNumber,
             price: outboundFlight.price || booking.totalPrice,
             duration: outboundFlight.duration,
-            
-            // Include the entire outboundFlight object for backward compatibility
             ...outboundFlight
           },
-          
-          // Include original booking properties
           ...booking
         };
       });
@@ -178,6 +214,11 @@ export default {
 
 .booking__entry
   padding-left 2rem
+
+.booking-details
+  background: $grey-1
+  border-radius: 8px
+  margin-top: 8px
 
 .wrapper
   padding 0 1rem
