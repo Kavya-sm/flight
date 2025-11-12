@@ -13,7 +13,6 @@ export async function fetchLoyalty({ commit }) {
   try {
     console.log("Fetching loyalty data via REST API");
 
-    // Use Amplify API with credentials
     const response = await API.get("loyaltyAPI", "/loyalty", {
       headers: {
         'Content-Type': 'application/json'
@@ -46,9 +45,9 @@ async function fetchLoyaltyWithProxy({ commit }) {
   try {
     console.log("Trying CORS proxy approach");
     
-    // Use a CORS proxy service
+    // Use a CORS proxy service - UPDATED TO /prod
     const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-    const targetUrl = 'https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/dev/loyalty';
+    const targetUrl = 'https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod/loyalty'; // ← Changed to /prod
     
     const response = await fetch(proxyUrl + targetUrl, {
       method: 'GET',
