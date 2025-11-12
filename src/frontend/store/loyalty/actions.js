@@ -10,24 +10,66 @@ export async function fetchLoyalty({ commit }) {
     message: "Loading loyalty data..."
   });
 
-  console.group("store/loyalty/actions/fetchLoyalty");
   try {
     console.log("Fetching loyalty data via REST API");
 
-    const response = await API.get("loyaltyAPI", "/loyalty");
-    const loyaltyData = response;
+    // Use Amplify API with credentials
+    const response = await API.get("loyaltyAPI", "/loyalty", {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
 
-    const loyalty = new Loyalty(loyaltyData);
+    const loyalty = new Loyalty(response);
     console.log("Loyalty data:", loyalty);
     commit("SET_LOYALTY", loyalty);
 
     Loading.hide();
-    console.groupEnd();
     return loyalty;
   } catch (err) {
     Loading.hide();
     console.error("Error fetching loyalty:", err);
+    
+    // If CORS error, try alternative approach
+    if (err.message.includes('Network Error') || err.message.includes('CORS')) {
+      return await fetchLoyaltyWithProxy({ commit });
+    }
+    
     throw new Error("Failed to fetch loyalty data");
+  }
+}
+
+/**
+ * Alternative method using proxy to bypass CORS
+ */
+async function fetchLoyaltyWithProxy({ commit }) {
+  try {
+    console.log("Trying CORS proxy approach");
+    
+    // Use a CORS proxy service
+    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+    const targetUrl = 'https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/dev/loyalty';
+    
+    const response = await fetch(proxyUrl + targetUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': 'https://main.d1r4zkv0u7sfsi.amplifyapp.com'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const loyaltyData = await response.json();
+    const loyalty = new Loyalty(loyaltyData);
+    commit("SET_LOYALTY", loyalty);
+    
+    return loyalty;
+  } catch (error) {
+    console.error("Proxy method also failed:", error);
+    throw error;
   }
 }
 
