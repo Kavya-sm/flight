@@ -1,61 +1,55 @@
 import Loyalty from "../../shared/models/LoyaltyClass";
-// @ts-ignore
 import { Loading } from "quasar";
 
-import { API, graphqlOperation } from "aws-amplify";
-import { getLoyalty } from "./graphql";
-
 /**
- * Loyalty [Vuex Module Action](https://vuex.vuejs.org/guide/actions.html) - fetchLoyalty retrieves current authenticated user loyalty info from Loyalty service.
- *
- * It uses SET_LOYALTY mutation to update Loyalty state with the latest information.
- *
- * It also uses Quasar Loading spinner when fetching data from Loyalty service.
- * @param {object} context - Vuex action context (context.commit, context.getters, context.state, context.dispatch)
- * @param {object} context.commit - Vuex mutation function (context.commit)
- * @returns {promise} - Promise representing updated whether loyalty information has been updated in the store
- * @see {@link SET_LOYALTY} for more info on mutation
- * @example
- * // exerpt from src/views/Profile.vuw
- * async mounted() {
- *    if (this.isAuthenticated) {
- *        await this.$store.dispatch("loyalty/fetchLoyalty");
- *    }
- * }
+ * Fetch loyalty data for current user
  */
 export async function fetchLoyalty({ commit }) {
   Loading.show({
-    message: "Loading profile..."
+    message: "Loading loyalty data..."
   });
 
   console.group("store/loyalty/actions/fetchLoyalty");
   try {
-    console.log("Fetching loyalty data");
-    const {
-      // @ts-ignore
-      data: { getLoyalty: loyaltyData }
-    } = await API.graphql(graphqlOperation(getLoyalty));
+    console.log("Fetching loyalty data via REST API");
     
-    // Transform the data to match your LoyaltyTable structure
-    const loyalty = new Loyalty({
-      id: loyaltyData.id,
-      userId: loyaltyData.userId,
-      points: loyaltyData.points || 0,
-      level: loyaltyData.level || "bronze",
-      remainingPoints: loyaltyData.remainingPoints || 0,
-      percentage: loyaltyData.percentage || 0,
-      createdAt: loyaltyData.createdAt,
-      updatedAt: loyaltyData.updatedAt
-    });
-
-    console.log(loyalty);
+    // Using REST API call - update 'loyaltyAPI' with your actual API name
+    const response = await API.get('loyaltyAPI', '/loyalty');
+    const loyaltyData = response;
+    
+    const loyalty = new Loyalty(loyaltyData);
+    console.log("Loyalty data:", loyalty);
     commit("SET_LOYALTY", loyalty);
 
     Loading.hide();
     console.groupEnd();
+    return loyalty;
   } catch (err) {
     Loading.hide();
     console.error("Error fetching loyalty:", err);
-    throw new Error(err);
+    throw new Error("Failed to fetch loyalty data");
+  }
+}
+
+/**
+ * Add points to user's loyalty account
+ */
+export async function addLoyaltyPoints({ commit, dispatch }, points) {
+  try {
+    console.log(`Adding ${points} loyalty points`);
+    
+    const response = await API.post('loyaltyAPI', '/loyalty/points', {
+      body: {
+        pointsToAdd: points
+      }
+    });
+    
+    const loyalty = new Loyalty(response);
+    commit("SET_LOYALTY", loyalty);
+    
+    return loyalty;
+  } catch (err) {
+    console.error("Error adding loyalty points:", err);
+    throw new Error("Failed to add loyalty points");
   }
 }
