@@ -1,3 +1,4 @@
+<!-- ONLY ONE FlightSelection.vue component -->
 <template>
   <q-page>
     <flight-toolbar
