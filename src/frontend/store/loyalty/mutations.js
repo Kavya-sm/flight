@@ -1,15 +1,27 @@
 /**
- *
- * Profile [Vuex Module Mutation](https://vuex.vuejs.org/guide/mutations.html) - SET_LOYALTY mutates Loyalty state with given loyalty info as payload.
- * @param {object} state - Vuex Profile Module State
- * @param {object} loyalty - Payload to bet set as loyalty info
- * @param {string} loyalty.level - Current loyalty level
- * @param {number} loyalty.points - Current amount of loyalty points
- * @param {number} loyalty.remainingPoints - Loyalty points necessary to reach next loyalty tier
- * @see {@link fetchLoyalty} for more info on action that calls SET_LOYALTY
+ * SET_LOYALTY mutation - updates loyalty state
  */
-export const SET_LOYALTY = async (state, loyalty) => {
-  loyalty.points = loyalty.points || 0;
-  loyalty.remainingPoints = loyalty.remainingPoints || 0;
-  state.loyalty = loyalty;
+export const SET_LOYALTY = (state, loyalty) => {
+  // Ensure all required properties exist with defaults
+  state.loyalty = {
+    points: loyalty.points || 0,
+    level: loyalty.level || 'bronze',
+    remainingPoints: loyalty.remainingPoints || 1000,
+    percentage: loyalty.percentage || 0,
+    userId: loyalty.userId,
+    createdAt: loyalty.createdAt,
+    updatedAt: loyalty.updatedAt
+  };
+};
+
+/**
+ * RESET_LOYALTY mutation - clears loyalty state
+ */
+export const RESET_LOYALTY = (state) => {
+  state.loyalty = {
+    points: 0,
+    level: 'bronze',
+    remainingPoints: 1000,
+    percentage: 0
+  };
 };
