@@ -2,8 +2,8 @@
   <q-page>
     <flight-toolbar
       v-if="selectedFlight"
-      :departure="selectedFlight.departureAirportCode"
-      :arrival="selectedFlight.arrivalAirportCode"
+      :departure="selectedFlight.departureAirport?.code || selectedFlight.departureAirportCode"
+      :arrival="selectedFlight.arrivalAirport?.code || selectedFlight.arrivalAirportCode"
     />
     
     <div class="flights">
@@ -13,17 +13,40 @@
         </div>
         <flight-loader v-if="loading" />
       </div>
+      
+      <!-- Debug flight data -->
+      <div class="wrapper text-center q-mb-md" v-if="selectedFlight">
+        <q-btn 
+          @click="debugFlight" 
+          color="info" 
+          label="Debug Flight Data" 
+          size="sm"
+          class="q-mb-sm"
+        />
+      </div>
+      
       <flight-card v-if="selectedFlight" :details="selectedFlight" />
+      
+      <div v-else-if="!loading" class="wrapper text-center q-mt-lg">
+        <q-icon name="error" size="4rem" color="negative" />
+        <div class="q-title q-mt-md text-negative">Flight not found</div>
+        <q-btn 
+          @click="$router.go(-1)" 
+          color="primary" 
+          label="Go Back" 
+          class="q-mt-md"
+        />
+      </div>
     </div>
 
-    <div class="form__payment">
+    <div class="form__payment" v-if="selectedFlight">
       <div class="text-center">
         <div class="form__header q-pt-md q-headline text-primary text-center">
           Payment details
         </div>
         
         <div class="form">
-          <form>
+          <form @submit.prevent="payment">
             <div class="group">
               <label for="name">
                 <span class="text-secondary">Name</span>
@@ -33,8 +56,13 @@
                   name="name"
                   placeholder="Name on card"
                   class="form__input field form__name"
+                  :class="{ 'error-field': $v.form.name.$error }"
                   required
+                  @blur="$v.form.name.$touch()"
                 />
+                <div class="validation-error" v-if="$v.form.name.$error">
+                  Name is required
+                </div>
               </label>
               
               <label>
@@ -42,11 +70,16 @@
                 <q-select
                   v-model="form.country"
                   class="q-pt-sm form__select form__country"
+                  :class="{ 'error-field': $v.form.country.$error }"
                   filter
                   placeholder="Country"
                   :options="form.countryOptions"
                   hide-underline
+                  @blur="$v.form.country.$touch()"
                 />
+                <div class="validation-error" v-if="$v.form.country.$error">
+                  Country is required
+                </div>
               </label>
               
               <label for="postcode">
@@ -57,23 +90,40 @@
                   name="postcode"
                   placeholder="Postcode"
                   class="form__input field form__postcode"
+                  :class="{ 'error-field': $v.form.postcode.$error }"
                   required
+                  @blur="$v.form.postcode.$touch()"
                 />
+                <div class="validation-error" v-if="$v.form.postcode.$error">
+                  Valid postcode is required (min 3 characters)
+                </div>
               </label>
               
               <label>
                 <span class="text-secondary">Card number</span>
-                <div id="card-number-element" class="form__stripe field form__card"></div>
+                <div 
+                  id="card-number-element" 
+                  class="form__stripe field form__card"
+                  :class="{ 'error-field': token.error && token.error.type === 'validation_error' }"
+                ></div>
               </label>
               
               <label>
                 <span class="text-secondary">Expiry date</span>
-                <div id="card-expiry-element" class="form__stripe field form__expiry"></div>
+                <div 
+                  id="card-expiry-element" 
+                  class="form__stripe field form__expiry"
+                  :class="{ 'error-field': token.error && token.error.type === 'validation_error' }"
+                ></div>
               </label>
               
               <label>
                 <span class="text-secondary">CVC</span>
-                <div id="card-cvc-element" class="form__stripe field form__cvc"></div>
+                <div 
+                  id="card-cvc-element" 
+                  class="form__stripe field form__cvc"
+                  :class="{ 'error-field': token.error && token.error.type === 'validation_error' }"
+                ></div>
               </label>
             </div>
             
@@ -85,24 +135,37 @@
           </form>
         </div>
 
-        <!-- Debug button -->
-        <q-btn 
-          @click="debugUser" 
-          class="q-mt-md" 
-          color="warning" 
-          label="Debug User Info"
-          size="sm"
-        />
+        <!-- Debug buttons -->
+        <div class="debug-buttons q-mt-md">
+          <q-btn 
+            @click="debugUser" 
+            color="warning" 
+            label="Debug User Info"
+            size="sm"
+            class="q-mr-sm"
+          />
+          <q-btn 
+            @click="debugPayment" 
+            color="info" 
+            label="Debug Payment Data"
+            size="sm"
+          />
+        </div>
 
         <q-btn
           @click="payment"
           class="cta__button text-weight-medium q-mt-md"
           color="secondary"
           label="Agree and pay now"
-          :disable="$v.form.$invalid || form.isCardInvalid"
+          :disable="$v.form.$invalid || form.isCardInvalid || processing"
+          :loading="processing"
         >
           <q-icon class="cta__button--direction" name="keyboard_arrow_right" size="2.6rem" />
         </q-btn>
+        
+        <div class="q-mt-sm text-caption text-grey-6">
+          Total: {{ selectedFlight.price ? `$${selectedFlight.price}` : 'Price not available' }}
+        </div>
       </div>
     </div>
   </q-page>
@@ -149,24 +212,46 @@ export default {
     })
   },
   async beforeMount() {
-    if (this.isAuthenticated && !this.flight) {
-      this.selectedFlight = await this.$store.dispatch("catalog/fetchByFlightId", {
-        flightId: this.flightId
+    try {
+      if (this.isAuthenticated && !this.flight) {
+        console.log('Fetching flight data for ID:', this.flightId);
+        this.selectedFlight = await this.$store.dispatch("catalog/fetchByFlightId", {
+          flightId: this.flightId
+        });
+        console.log('Flight data loaded:', this.selectedFlight);
+      } else if (this.flight) {
+        console.log('Using prop flight data:', this.flight);
+        this.selectedFlight = this.flight;
+      }
+    } catch (error) {
+      console.error('Error loading flight:', error);
+      this.$q.notify({
+        type: 'negative',
+        message: 'Failed to load flight details',
+        timeout: 3000
       });
     }
   },
   mounted() {
     this.loadStripeJS()
       .then(() => this.loadStripeElements())
-      .catch(console.error);
+      .catch(error => {
+        console.error('Stripe loading error:', error);
+        this.$q.notify({
+          type: 'negative',
+          message: 'Payment system initialization failed',
+          timeout: 3000
+        });
+      });
   },
   data() {
     return {
-      token: { details: "", error: "" },
+      token: { details: null, error: null },
       stripeKey: process.env.VUE_APP_StripePublicKey || "pk_test_your_key",
+      processing: false,
       form: {
         name: "",
-        country: "",
+        country: null,
         postcode: "",
         countryOptions: [
           { label: "Brazil", value: "BR" },
@@ -180,14 +265,13 @@ export default {
   },
   methods: {
     debugUser() {
-      console.group("USER DEBUG INFO");
+      console.group("👤 USER DEBUG INFO");
       console.log("Profile store:", this.profile);
       console.log("Profile user:", this.profile?.user);
       console.log("Customer getter:", this.customer);
       console.log("First name:", this.firstName);
       console.log("Is authenticated:", this.isAuthenticated);
       
-      // Show available user IDs
       const user = this.profile?.user;
       console.log("Available user IDs:", {
         id: user?.id,
@@ -198,11 +282,56 @@ export default {
       console.groupEnd();
     },
 
+    debugFlight() {
+      console.group("✈️ FLIGHT DEBUG INFO");
+      console.log("Selected flight:", this.selectedFlight);
+      console.log("Flight ID prop:", this.flightId);
+      console.log("Flight prop:", this.flight);
+      console.log("Airport codes:", {
+        departure: this.selectedFlight.departureAirport?.code || this.selectedFlight.departureAirportCode,
+        arrival: this.selectedFlight.arrivalAirport?.code || this.selectedFlight.arrivalAirportCode
+      });
+      console.groupEnd();
+    },
+
+    debugPayment() {
+      console.group("💳 PAYMENT DEBUG INFO");
+      console.log("Form data:", this.form);
+      console.log("Form validation:", this.$v.form);
+      console.log("Stripe token:", this.token);
+      console.log("Card invalid:", this.form.isCardInvalid);
+      console.log("Processing:", this.processing);
+      console.groupEnd();
+    },
+
     async payment() {
+      // Validate form first
+      this.$v.form.$touch();
+      if (this.$v.form.$invalid) {
+        this.$q.notify({
+          type: 'negative',
+          message: 'Please fix form errors before submitting',
+          timeout: 3000
+        });
+        return;
+      }
+
+      if (this.form.isCardInvalid) {
+        this.$q.notify({
+          type: 'negative',
+          message: 'Please complete card details',
+          timeout: 3000
+        });
+        return;
+      }
+
+      this.processing = true;
+      this.$q.loading.show({ message: "Processing payment..." });
+
       const options = {
         name: this.form.name,
         address_zip: this.form.postcode,
-        address_country: this.form.country
+        address_country: this.form.country?.value || this.form.country
       };
 
       try {
@@ -211,9 +340,11 @@ export default {
         this.token.details = token;
         this.token.error = error;
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
-        // Get user data
+        // Get user data with better fallbacks
         const user = this.profile?.user;
         const userId = user?.id || user?.sub || user?.username;
 
@@ -223,7 +354,7 @@ export default {
 
         console.log("Creating booking for user:", userId);
 
-        // Prepare booking data
+        // Prepare booking data with better defaults
         const passengers = [{
           name: this.form.name || this.firstName || "Passenger",
           email: user?.email || this.customer?.email || "user@example.com"
@@ -234,6 +365,14 @@ export default {
           phone: user?.phone_number || this.customer?.phone_number || "",
           name: this.form.name || this.firstName || "Passenger"
         };
+
+        console.log("Booking payload:", {
+          paymentToken: this.token,
+          outboundFlight: this.selectedFlight,
+          userId: userId,
+          passengers: passengers,
+          contactInfo: contactInfo
+        });
 
         // Create booking
         await this.$store.dispatch("bookings/createBooking", {
@@ -255,13 +394,16 @@ export default {
         }, 2000);
 
       } catch (err) {
-        this.$q.loading.hide();
         console.error("Payment error:", err);
+        this.$q.loading.hide();
         this.$q.notify({
           type: "negative",
           message: `Booking failed: ${err.message}`,
-          timeout: 5000
+          timeout: 5000,
+          actions: [{ icon: 'close', color: 'white' }]
         });
+      } finally {
+        this.processing = false;
       }
     },
 
@@ -275,7 +417,7 @@ export default {
         const script = document.createElement("script");
         script.src = "https://js.stripe.com/v3/";
         script.onload = resolve;
-        script.onerror = () => reject("Failed to load Stripe");
+        script.onerror = () => reject(new Error("Failed to load Stripe"));
         document.head.appendChild(script);
       });
     },
@@ -286,29 +428,39 @@ export default {
     },
 
     loadStripeElements() {
-      stripe = window.Stripe(this.stripeKey);
-      const elements = stripe.elements();
-      const style = {
-        base: {
-          color: "#31325F",
-          fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
-          fontSmoothing: "antialiased",
-          fontSize: "16px",
-          "::placeholder": { color: "#CFD7E0" }
-        }
-      };
+      try {
+        stripe = window.Stripe(this.stripeKey);
+        const elements = stripe.elements();
+        const style = {
+          base: {
+            color: "#31325F",
+            fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+            fontSmoothing: "antialiased",
+            fontSize: "16px",
+            "::placeholder": { color: "#CFD7E0" }
+          },
+          invalid: {
+            color: "#E25950"
+          }
+        };
 
-      card = elements.create("cardNumber", { style });
-      const cardExpiry = elements.create("cardExpiry", { style });
-      const cardCvc = elements.create("cardCvc", { style });
+        card = elements.create("cardNumber", { style });
+        const cardExpiry = elements.create("cardExpiry", { style });
+        const cardCvc = elements.create("cardCvc", { style });
 
-      card.mount("#card-number-element");
-      cardExpiry.mount("#card-expiry-element");
-      cardCvc.mount("#card-cvc-element");
+        card.mount("#card-number-element");
+        cardExpiry.mount("#card-expiry-element");
+        cardCvc.mount("#card-cvc-element");
 
-      card.on("change", this.updateCardFeedback);
-      cardExpiry.on("change", this.updateCardFeedback);
-      cardCvc.on("change", this.updateCardFeedback);
+        card.on("change", this.updateCardFeedback);
+        cardExpiry.on("change", this.updateCardFeedback);
+        cardCvc.on("change", this.updateCardFeedback);
+
+        console.log("Stripe elements loaded successfully");
+      } catch (error) {
+        console.error("Error loading Stripe elements:", error);
+        throw error;
+      }
     }
   }
 };
@@ -339,17 +491,22 @@ form
 label
   position relative
   font-weight 300
-  height 40px
+  height auto
+  min-height 40px
   line-height 40px
   display flex
+  flex-direction column
+  padding 8px 0
 
 .group label:not(:last-child)
   border-bottom 1px solid #F0F5FA
 
 label > span
-  width 120px
-  text-align right
-  margin-right 0.4rem
+  width 100%
+  text-align left
+  margin-right 0
+  margin-bottom 4px
+  font-weight 500
 
 .field
   background transparent
@@ -361,9 +518,24 @@ label > span
   padding-right 10px
   padding-left 10px
   cursor text
+  min-height 32px
+
+.form__stripe
+  min-height 32px
+  padding-top 8px
 
 .field::-webkit-input-placeholder
   color #CFD7E0
+
+.error-field
+  border 1px solid #E25950 !important
+  border-radius 4px
+
+.validation-error
+  color #E25950
+  font-size 12px
+  margin-top 4px
+  text-align left
 
 .outcome
   float left
@@ -373,6 +545,18 @@ label > span
   text-align center
 
 .error
-  font-size 20px
+  font-size 14px
+  margin-top 8px
+
+.debug-buttons
+  display flex
+  justify-content center
+  gap 8px
+
+.wrapper
+  padding 0 1rem
+
+.text-caption
+  font-size 12px
 </style>
 
