@@ -6,14 +6,14 @@
       </div>
     </div>
 
-    <!-- Debug button -->
-    <div class="wrapper text-center">
+    <!-- Debug button to help see the data -->
+    <div class="wrapper text-center q-mb-md">
       <q-btn 
         @click="debugBookings" 
-        label="Debug Bookings" 
+        label="Debug Bookings Data" 
         color="warning" 
-        class="q-mb-md" 
         size="sm"
+        class="q-mb-md"
       />
     </div>
     
@@ -22,10 +22,12 @@
         <div class="booking" v-for="booking in normalizedBookings" :key="booking.id">
           <q-timeline-entry class="booking__entry" icon="flight_takeoff" side="left">
             <h5 slot="subtitle" class="q-timeline-subtitle">
-              <span>
-                {{ booking.flight.departureAirportCode }} → 
-                {{ booking.flight.arrivalAirportCode }} &mdash;
+              <span v-if="booking.flight.departureAirportCode && booking.flight.arrivalAirportCode">
+                {{ booking.flight.departureAirportCode }} → {{ booking.flight.arrivalAirportCode }} &mdash;
                 {{ formatDate(booking.flight.departureDate) }}
+              </span>
+              <span v-else class="text-warning">
+                Flight details loading...
               </span>
             </h5>
             <booking-flight
@@ -55,10 +57,7 @@ export default {
   
   mounted() {
     if (this.isAuthenticated) {
-      this.loadBookings().then(() => {
-        // Auto-debug to see the data structure
-        this.debugBookings();
-      });
+      this.loadBookings();
     }
   },
   
@@ -90,24 +89,25 @@ export default {
       }
     },
 
+    // Debug method to see the actual data structure
     debugBookings() {
-      console.group("📦 BOOKINGS DEBUG INFO");
-      console.log("All bookings raw data:", this.bookings);
-      if (this.bookings.length > 0) {
-        console.log("First booking details:", this.bookings[0]);
+      console.group("🔍 BOOKINGS DEBUG INFO");
+      console.log("Raw bookings from Vuex:", this.bookings);
+      if (this.bookings && this.bookings.length > 0) {
+        console.log("First booking raw data:", this.bookings[0]);
         console.log("First booking outboundFlight:", this.bookings[0].outboundFlight);
         console.log("First booking normalized:", this.normalizedBookings[0]);
+      } else {
+        console.log("No bookings found");
       }
       console.groupEnd();
-      
-      // Show in UI as well
-      if (this.bookings.length > 0) {
-        this.$q.notify({
-          message: `Found ${this.bookings.length} booking(s). Check console for details.`,
-          color: 'info',
-          timeout: 4000
-        });
-      }
+
+      // Show notification with basic info
+      this.$q.notify({
+        message: `Found ${this.bookings.length} booking(s) - check console for details`,
+        color: 'info',
+        timeout: 4000
+      });
     }
   },
   
@@ -116,40 +116,48 @@ export default {
       bookings: state => state.bookings.bookings
     }),
     ...mapGetters("profile", ["isAuthenticated"]),
-    
-    // Normalize the booking data to match the expected template structure
+
+    // Normalize the booking data to match what the template expects
     normalizedBookings() {
+      if (!this.bookings || !Array.isArray(this.bookings)) {
+        return [];
+      }
+
       return this.bookings.map(booking => {
-        // Handle different possible data structures
-        const outboundFlight = booking.outboundFlight || booking.flight || {};
-        const departureAirport = outboundFlight.departureAirport || {};
-        const arrivalAirport = outboundFlight.arrivalAirport || {};
+        // The API returns flight data in outboundFlight, but template expects it in flight
+        const outboundFlight = booking.outboundFlight || {};
         
         return {
-          id: booking.id || booking.bookingID,
+          // Keep the original booking ID
+          id: booking.id,
           bookingID: booking.bookingReference || booking.id,
+          
+          // Transform the flight data to match what BookingFlight component expects
           flight: {
-            // Airport codes
-            departureAirportCode: departureAirport.code || outboundFlight.departureAirportCode || 'Unknown',
-            arrivalAirportCode: arrivalAirport.code || outboundFlight.arrivalAirportCode || 'Unknown',
+            // Airport codes - handle both nested and flat structures
+            departureAirportCode: outboundFlight.departureAirport?.code || 
+                                outboundFlight.departureAirportCode || 
+                                'Unknown',
+            arrivalAirportCode: outboundFlight.arrivalAirport?.code || 
+                              outboundFlight.arrivalAirportCode || 
+                              'Unknown',
             
-            // Airport names (if needed)
-            departureAirportName: departureAirport.name || outboundFlight.departureAirportName,
-            arrivalAirportName: arrivalAirport.name || outboundFlight.arrivalAirportName,
+            // Dates
+            departureDate: outboundFlight.departureTime || 
+                          outboundFlight.departureDate,
+            arrivalDate: outboundFlight.arrivalTime || 
+                        outboundFlight.arrivalDate,
             
-            // Dates and times
-            departureDate: outboundFlight.departureTime || outboundFlight.departureDate,
-            arrivalDate: outboundFlight.arrivalTime || outboundFlight.arrivalDate,
-            
-            // Flight details
+            // Other flight details that might be needed
             flightNumber: outboundFlight.flightNumber,
-            price: outboundFlight.price,
+            price: outboundFlight.price || booking.totalPrice,
             duration: outboundFlight.duration,
             
-            // Include the original outboundFlight for components that need it
+            // Include the entire outboundFlight object for backward compatibility
             ...outboundFlight
           },
-          // Include original booking data
+          
+          // Include original booking properties
           ...booking
         };
       });
