@@ -23,7 +23,7 @@ const awsmobile = {
   "aws_cloud_logic_custom": [
     {
       "name": "loyaltyAPI",
-      "endpoint": "https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/dev",
+      "endpoint": "https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod",
       "region": "ap-south-1"
     }
   ]
