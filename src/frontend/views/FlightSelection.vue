@@ -559,4 +559,3 @@ label > span
 .text-caption
   font-size 12px
 </style>
-
