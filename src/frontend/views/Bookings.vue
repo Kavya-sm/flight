@@ -30,14 +30,9 @@
                 Flight details loading...
               </span>
             </h5>
-            <!-- Remove BookingFlight component if it's causing duplicates -->
-            <!-- <booking-flight
-              :bookingID="booking.bookingID"
-              :flight="booking.flight"
-            /> -->
             
-            <!-- Instead, show simple flight details -->
-            <div class="booking-details q-pa-md">
+            <!-- Simple flight details display -->
+            <div class="booking-details q-pa-md" v-if="booking.flight.departureAirportCode !== 'Unknown'">
               <div class="row items-center">
                 <div class="col-6 text-center">
                   <div class="text-h4 text-primary">{{ booking.flight.departureAirportCode }}</div>
@@ -52,19 +47,14 @@
               </div>
               <div class="row justify-center q-mt-sm">
                 <div class="text-caption text-grey">
-                  Flight {{ booking.flight.flightNumber }} • 
-                  {{ booking.flight.duration || 'Duration not available' }}
+                  Booking Ref: {{ booking.bookingID }}
                 </div>
               </div>
-              <div class="row justify-center q-mt-sm">
-                <q-btn 
-                  label="View Details" 
-                  color="primary" 
-                  size="sm" 
-                  outline
-                  @click="viewBookingDetails(booking)"
-                />
-              </div>
+            </div>
+            
+            <div v-else class="booking-details q-pa-md text-warning text-center">
+              <q-icon name="warning" class="q-mr-sm" />
+              Flight details not available
             </div>
           </q-timeline-entry>
         </div>
@@ -80,14 +70,11 @@
 </template>
 
 <script>
-// import BookingFlight from "../components/BookingFlight"; // Remove this import
 import { mapState, mapGetters } from "vuex";
 
 export default {
   name: "Bookings",
-  components: { 
-    // BookingFlight // Remove this component
-  },
+  components: { },
   
   mounted() {
     if (this.isAuthenticated) {
@@ -138,26 +125,29 @@ export default {
       }
     },
 
-    viewBookingDetails(booking) {
-      console.log('Booking details:', booking);
-      this.$q.notify({
-        message: `Booking ${booking.bookingID} details`,
-        color: 'info',
-        timeout: 2000
-      });
-    },
-
     debugBookings() {
       console.group("📦 BOOKINGS DEBUG INFO");
       console.log("All bookings raw data:", this.bookings);
-      if (this.bookings.length > 0) {
-        console.log("First booking details:", this.bookings[0]);
-        console.log("First booking outboundFlight:", this.bookings[0].outboundFlight);
+      if (this.bookings && this.bookings.length > 0) {
+        console.log("First booking details:", JSON.parse(JSON.stringify(this.bookings[0])));
+        console.log("First booking keys:", Object.keys(this.bookings[0]));
+        
+        // Check for flight data in different possible locations
+        const firstBooking = this.bookings[0];
+        console.log("Available flight data locations:", {
+          outboundFlight: firstBooking.outboundFlight,
+          flight: firstBooking.flight,
+          departureAirport: firstBooking.departureAirport,
+          arrivalAirport: firstBooking.arrivalAirport,
+          departureAirportCode: firstBooking.departureAirportCode,
+          arrivalAirportCode: firstBooking.arrivalAirportCode
+        });
+        
         console.log("First booking normalized:", this.normalizedBookings[0]);
       }
       console.groupEnd();
       
-      if (this.bookings.length > 0) {
+      if (this.bookings && this.bookings.length > 0) {
         this.$q.notify({
           message: `Found ${this.bookings.length} booking(s). Check console for details.`,
           color: 'info',
@@ -174,25 +164,49 @@ export default {
     ...mapGetters("profile", ["isAuthenticated"]),
     
     normalizedBookings() {
+      if (!this.bookings || !Array.isArray(this.bookings)) {
+        return [];
+      }
+
       return this.bookings.map(booking => {
-        const outboundFlight = booking.outboundFlight || {};
-        const departureAirport = outboundFlight.departureAirport || {};
-        const arrivalAirport = outboundFlight.arrivalAirport || {};
+        console.log("Processing booking:", booking);
+        
+        // Try multiple possible locations for flight data
+        const flightData = booking.outboundFlight || booking.flight || booking;
+        
+        // Extract airport data from various possible structures
+        const departureAirport = flightData.departureAirport || {};
+        const arrivalAirport = flightData.arrivalAirport || {};
         
         return {
-          id: booking.id,
-          bookingID: booking.bookingReference || booking.id,
+          id: booking.id || booking.bookingID,
+          bookingID: booking.bookingReference || booking.id || 'Unknown',
           flight: {
-            departureAirportCode: departureAirport.code || outboundFlight.departureAirportCode || 'Unknown',
-            arrivalAirportCode: arrivalAirport.code || outboundFlight.arrivalAirportCode || 'Unknown',
-            departureAirportName: departureAirport.name || outboundFlight.departureAirportName,
-            arrivalAirportName: arrivalAirport.name || outboundFlight.arrivalAirportName,
-            departureDate: outboundFlight.departureTime || outboundFlight.departureDate,
-            arrivalDate: outboundFlight.arrivalTime || outboundFlight.arrivalDate,
-            flightNumber: outboundFlight.flightNumber,
-            price: outboundFlight.price || booking.totalPrice,
-            duration: outboundFlight.duration,
-            ...outboundFlight
+            // Try multiple possible locations for airport codes
+            departureAirportCode: departureAirport.code || 
+                                flightData.departureAirportCode || 
+                                booking.departureAirportCode ||
+                                'Unknown',
+            arrivalAirportCode: arrivalAirport.code || 
+                              flightData.arrivalAirportCode || 
+                              booking.arrivalAirportCode ||
+                              'Unknown',
+            departureAirportName: departureAirport.name || 
+                                flightData.departureAirportName || 
+                                booking.departureAirportName,
+            arrivalAirportName: arrivalAirport.name || 
+                              flightData.arrivalAirportName || 
+                              booking.arrivalAirportName,
+            departureDate: flightData.departureTime || 
+                          flightData.departureDate || 
+                          booking.departureDate,
+            arrivalDate: flightData.arrivalTime || 
+                        flightData.arrivalDate || 
+                        booking.arrivalDate,
+            flightNumber: flightData.flightNumber || booking.flightNumber,
+            price: flightData.price || booking.totalPrice,
+            duration: flightData.duration || booking.duration,
+            ...flightData
           },
           ...booking
         };
@@ -207,10 +221,6 @@ export default {
 
 .booking__heading
   margin-top 2rem
-
-.booking__flight
-  margin 0 !important
-  margin-right 1rem !important
 
 .booking__entry
   padding-left 2rem
