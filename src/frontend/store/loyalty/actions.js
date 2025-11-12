@@ -80,7 +80,7 @@ export async function addLoyaltyPoints({ commit }, points) {
   try {
     console.log(`Adding ${points} loyalty points`);
 
-    const response = await API.post("loyaltyAPI", "/loyalty/points", {
+    const response = await API.post("loyaltyAPI", "/loyalty", {
       body: {
         pointsToAdd: points
       }
