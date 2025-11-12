@@ -78,18 +78,6 @@
             </q-list>
           </div>
         </div>
-        
-        <!-- Test button to add points (remove in production) -->
-        <div class="row q-mt-lg" v-if="isAuthenticated">
-          <div class="col-12">
-            <q-btn 
-              color="primary" 
-              label="Add 100 Points (Test)" 
-              @click="addTestPoints"
-              class="full-width"
-            />
-          </div>
-        </div>
       </div>
       
       <amplify-sign-out class="Form--signout"></amplify-sign-out>
@@ -134,24 +122,6 @@ export default {
         return 'Maximum tier reached!';
       }
       return `${this.loyalty.percentage}% to next tier`;
-    }
-  },
-  methods: {
-    async addTestPoints() {
-      try {
-        await this.$store.dispatch("loyalty/addLoyaltyPoints", 100);
-        this.$q.notify({
-          type: 'positive',
-          message: '100 points added successfully!',
-          timeout: 2000
-        });
-      } catch (error) {
-        this.$q.notify({
-          type: 'negative',
-          message: 'Failed to add points',
-          timeout: 2000
-        });
-      }
     }
   },
   async mounted() {
