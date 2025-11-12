@@ -1,13 +1,14 @@
 /**
- * Loyalty [Vuex Module](https://vuex.vuejs.org/guide/modules.html) - It holds a customer loyalty information.
- * @see {@link SET_LOYALTY} for more info on mutation
- * @see {@link fetchLoyalty} for more info on action
+ * Loyalty Vuex Module State
  */
 export default {
   loyalty: {
     points: 0,
     level: "bronze",
-    remainingPoints: 0,
-    percentage: 0
+    remainingPoints: 1000,
+    percentage: 0,
+    userId: null,
+    createdAt: null,
+    updatedAt: null
   }
 };
