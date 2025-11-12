@@ -67,34 +67,10 @@
           </q-list>
         </q-timeline-entry>
       </q-timeline>
-
-      <div
-        class="booking__modal--ctas booking__modal--highlighted row inline full-width q-pl-lg"
-      >
-        <div class="col-6">
-          <q-btn
-            class="full-width cta__button-check-in"
-            flat
-            color="primary"
-            label="Check-in"
-            data-test="booking-check-in"
-            @click="checkIn"
-          />
-        </div>
-        <div class="col-6">
-          <q-btn
-            class="full-width cta__button-cancel"
-            flat
-            color="secondary"
-            label="Cancel booking"
-            data-test="booking-cancel"
-            @click="cancelBooking"
-          />
-        </div>
-      </div>
     </div>
   </q-modal>
 </template>
+
 <style lang="stylus">
 @import '~variables'
 
@@ -115,6 +91,7 @@
     margin 0
     padding 0
 </style>
+
 <script>
 // @ts-ignore
 import { date } from "quasar";
@@ -173,12 +150,6 @@ export default {
     hideCard: function() {
       // @ts-ignore
       this.$refs["modal"].hide();
-    },
-    checkIn() {
-      this.$q.notify("Not implemented");
-    },
-    cancelBooking() {
-      this.$q.notify("Not implemented");
     }
   },
   /**
