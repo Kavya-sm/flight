@@ -35,7 +35,18 @@ export async function fetchLoyalty({ commit }) {
       // @ts-ignore
       data: { getLoyalty: loyaltyData }
     } = await API.graphql(graphqlOperation(getLoyalty));
-    const loyalty = new Loyalty(loyaltyData);
+    
+    // Transform the data to match your LoyaltyTable structure
+    const loyalty = new Loyalty({
+      id: loyaltyData.id,
+      userId: loyaltyData.userId,
+      points: loyaltyData.points || 0,
+      level: loyaltyData.level || "bronze",
+      remainingPoints: loyaltyData.remainingPoints || 0,
+      percentage: loyaltyData.percentage || 0,
+      createdAt: loyaltyData.createdAt,
+      updatedAt: loyaltyData.updatedAt
+    });
 
     console.log(loyalty);
     commit("SET_LOYALTY", loyalty);
@@ -44,6 +55,7 @@ export async function fetchLoyalty({ commit }) {
     console.groupEnd();
   } catch (err) {
     Loading.hide();
+    console.error("Error fetching loyalty:", err);
     throw new Error(err);
   }
 }
