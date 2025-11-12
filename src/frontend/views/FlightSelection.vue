@@ -1,118 +1,135 @@
-<!-- ONLY ONE FlightSelection.vue component -->
 <template>
   <q-page>
-    <flight-toolbar
-      v-if="selectedFlight"
-      :departure="getDepartureCode()"
-      :arrival="getArrivalCode()"
-    />
-    
-    <div class="flights">
-      <div class="heading">
-        <div class="q-headline text-primary text-center flight__headline">
-          Review your selection
+    <div v-if="selectedFlight">
+      <flight-toolbar
+        :departure="getDepartureCode()"
+        :arrival="getArrivalCode()"
+      />
+      
+      <div class="flights">
+        <div class="heading">
+          <div class="q-headline text-primary text-center flight__headline">
+            Review your selection
+          </div>
         </div>
-        <flight-loader v-if="loading" />
+        
+        <flight-card :details="selectedFlight" />
       </div>
-      
-      <flight-card v-if="selectedFlight" :details="selectedFlight" />
-      
-      <div v-else-if="!loading" class="wrapper text-center q-mt-lg">
-        <q-icon name="error" size="4rem" color="negative" />
-        <div class="q-title q-mt-md text-negative">Flight not found</div>
-        <q-btn 
-          @click="$router.go(-1)" 
-          color="primary" 
-          label="Go Back" 
-          class="q-mt-md"
-        />
+
+      <div class="form__payment">
+        <div class="text-center">
+          <div class="form__header q-pt-md q-headline text-primary text-center">
+            Payment details
+          </div>
+          
+          <div class="form">
+            <form @submit.prevent="payment">
+              <div class="group">
+                <label for="name">
+                  <span class="text-secondary">Name</span>
+                  <input
+                    v-model="form.name"
+                    id="name"
+                    name="name"
+                    placeholder="Name on card"
+                    class="form__input field form__name"
+                    required
+                  />
+                </label>
+                
+                <label>
+                  <span class="text-secondary">Country</span>
+                  <q-select
+                    v-model="form.country"
+                    class="q-pt-sm form__select form__country"
+                    filter
+                    placeholder="Country"
+                    :options="form.countryOptions"
+                    hide-underline
+                  />
+                </label>
+                
+                <label for="postcode">
+                  <span class="text-secondary">Postcode</span>
+                  <input
+                    v-model="form.postcode"
+                    id="postcode"
+                    name="postcode"
+                    placeholder="Postcode"
+                    class="form__input field form__postcode"
+                    required
+                  />
+                </label>
+                
+                <label>
+                  <span class="text-secondary">Card number</span>
+                  <div id="card-number-element" class="form__stripe field form__card"></div>
+                </label>
+                
+                <label>
+                  <span class="text-secondary">Expiry date</span>
+                  <div id="card-expiry-element" class="form__stripe field form__expiry"></div>
+                </label>
+                
+                <label>
+                  <span class="text-secondary">CVC</span>
+                  <div id="card-cvc-element" class="form__stripe field form__cvc"></div>
+                </label>
+              </div>
+              
+              <div class="outcome">
+                <div class="error text-bold text-secondary form__error" v-if="token.error">
+                  {{ token.error.message }}
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <q-btn
+            @click="payment"
+            class="cta__button text-weight-medium q-mt-md"
+            color="secondary"
+            label="Agree and pay now"
+            :disable="form.isCardInvalid || processing"
+            :loading="processing"
+          >
+            <q-icon class="cta__button--direction" name="keyboard_arrow_right" size="2.6rem" />
+          </q-btn>
+          
+          <div class="q-mt-sm text-caption text-grey-6">
+            Total: {{ selectedFlight.price ? `$${selectedFlight.price}` : 'Price not available' }}
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="form__payment" v-if="selectedFlight">
-      <div class="text-center">
-        <div class="form__header q-pt-md q-headline text-primary text-center">
-          Payment details
-        </div>
-        
-        <div class="form">
-          <form @submit.prevent="payment">
-            <div class="group">
-              <label for="name">
-                <span class="text-secondary">Name</span>
-                <input
-                  v-model="form.name"
-                  id="name"
-                  name="name"
-                  placeholder="Name on card"
-                  class="form__input field form__name"
-                  required
-                />
-              </label>
-              
-              <label>
-                <span class="text-secondary">Country</span>
-                <q-select
-                  v-model="form.country"
-                  class="q-pt-sm form__select form__country"
-                  filter
-                  placeholder="Country"
-                  :options="form.countryOptions"
-                  hide-underline
-                />
-              </label>
-              
-              <label for="postcode">
-                <span class="text-secondary">Postcode</span>
-                <input
-                  v-model="form.postcode"
-                  id="postcode"
-                  name="postcode"
-                  placeholder="Postcode"
-                  class="form__input field form__postcode"
-                  required
-                />
-              </label>
-              
-              <label>
-                <span class="text-secondary">Card number</span>
-                <div id="card-number-element" class="form__stripe field form__card"></div>
-              </label>
-              
-              <label>
-                <span class="text-secondary">Expiry date</span>
-                <div id="card-expiry-element" class="form__stripe field form__expiry"></div>
-              </label>
-              
-              <label>
-                <span class="text-secondary">CVC</span>
-                <div id="card-cvc-element" class="form__stripe field form__cvc"></div>
-              </label>
-            </div>
-            
-            <div class="outcome">
-              <div class="error text-bold text-secondary form__error" v-if="token.error">
-                {{ token.error.message }}
-              </div>
-            </div>
-          </form>
-        </div>
+    <div v-else-if="loading" class="wrapper text-center q-mt-lg">
+      <flight-loader />
+      <div class="q-title q-mt-md text-grey-6">Loading flight details...</div>
+    </div>
 
-        <q-btn
-          @click="payment"
-          class="cta__button text-weight-medium q-mt-md"
-          color="secondary"
-          label="Agree and pay now"
-          :disable="form.isCardInvalid || processing"
-          :loading="processing"
-        >
-          <q-icon class="cta__button--direction" name="keyboard_arrow_right" size="2.6rem" />
-        </q-btn>
-        
-        <div class="q-mt-sm text-caption text-grey-6">
-          Total: {{ selectedFlight.price ? `$${selectedFlight.price}` : 'Price not available' }}
-        </div>
-      </div>
+    <div v-else-if="flightError" class="wrapper text-center q-mt-lg">
+      <q-icon name="error" size="4rem" color="negative" />
+      <div class="q-title q-mt-md text-negative">Flight not found</div>
+      <div class="q-subtitle text-grey-6 q-mb-md">Flight ID: {{ flightId }}</div>
+      <div class="q-caption text-grey-6 q-mb-md">The flight "{{ flightId }}" was not found in our system.</div>
+      <q-btn 
+        @click="$router.push('/flights')" 
+        color="primary" 
+        label="Browse Available Flights" 
+        class="q-mt-md"
+      />
+    </div>
+
+    <div v-else class="wrapper text-center q-mt-lg">
+      <q-icon name="help" size="4rem" color="warning" />
+      <div class="q-title q-mt-md text-warning">Unable to load flight</div>
+      <q-btn 
+        @click="$router.push('/flights')" 
+        color="primary" 
+        label="Back to Flights" 
+        class="q-mt-md"
+      />
     </div>
   </q-page>
 </template>
@@ -147,41 +164,24 @@ export default {
       profile: state => state.profile
     })
   },
-  async beforeMount() {
-    try {
-      if (this.isAuthenticated && !this.flight) {
-        this.selectedFlight = await this.$store.dispatch("catalog/fetchByFlightId", {
-          flightId: this.flightId
-        });
-      } else if (this.flight) {
-        this.selectedFlight = this.flight;
-      }
-    } catch (error) {
-      console.error('Error loading flight:', error);
-      this.$q.notify({
-        type: 'negative',
-        message: 'Failed to load flight details',
-        timeout: 3000
-      });
+  async mounted() {
+    console.log('FlightSelection mounted with flightId:', this.flightId);
+    
+    // Load flight data first
+    await this.loadFlightData();
+    
+    // Only load Stripe if we have a flight
+    if (this.selectedFlight) {
+      await this.loadStripe();
     }
-  },
-  mounted() {
-    this.loadStripeJS()
-      .then(() => this.loadStripeElements())
-      .catch(error => {
-        console.error('Stripe loading error:', error);
-        this.$q.notify({
-          type: 'negative',
-          message: 'Payment system initialization failed',
-          timeout: 3000
-        });
-      });
   },
   data() {
     return {
       token: { details: null, error: null },
       stripeKey: process.env.VUE_APP_StripePublicKey || "pk_test_your_key",
       processing: false,
+      flightError: null,
+      stripeLoaded: false,
       form: {
         name: "",
         country: null,
@@ -193,10 +193,77 @@ export default {
         ],
         isCardInvalid: true
       },
-      selectedFlight: this.flight
+      selectedFlight: null
     };
   },
+  watch: {
+    // Watch for flight prop changes
+    flight: {
+      immediate: true,
+      handler(newFlight) {
+        if (newFlight) {
+          console.log('Flight prop received:', newFlight);
+          this.selectedFlight = newFlight;
+          this.flightError = null;
+        }
+      }
+    }
+  },
   methods: {
+    async loadFlightData() {
+      if (!this.flightId) {
+        console.error('No flight ID provided');
+        this.flightError = 'No flight ID provided';
+        return;
+      }
+
+      try {
+        console.log('Loading flight with ID:', this.flightId);
+        
+        // First, check if we already have the flight data as a prop
+        if (this.flight) {
+          console.log('Using flight prop data');
+          this.selectedFlight = this.flight;
+          return;
+        }
+
+        // If not, fetch from API
+        if (this.isAuthenticated) {
+          console.log('Fetching flight from catalog...');
+          this.selectedFlight = await this.$store.dispatch("catalog/fetchByFlightId", {
+            flightId: this.flightId
+          });
+          console.log('Flight data loaded:', this.selectedFlight);
+        } else {
+          this.flightError = 'Please log in to view flight details';
+        }
+      } catch (error) {
+        console.error('Error loading flight:', error);
+        this.flightError = error.message;
+        this.selectedFlight = null;
+        this.$q.notify({
+          type: 'negative',
+          message: `Flight "${this.flightId}" not found. Please try a different flight.`,
+          timeout: 5000
+        });
+      }
+    },
+
+    async loadStripe() {
+      try {
+        await this.loadStripeJS();
+        this.loadStripeElements();
+        this.stripeLoaded = true;
+      } catch (error) {
+        console.error('Stripe loading error:', error);
+        this.$q.notify({
+          type: 'negative',
+          message: 'Payment system initialization failed',
+          timeout: 3000
+        });
+      }
+    },
+
     getDepartureCode() {
       if (!this.selectedFlight) return '';
       return this.selectedFlight.departureAirport?.code || 
@@ -212,6 +279,15 @@ export default {
     },
 
     async payment() {
+      if (!this.stripeLoaded) {
+        this.$q.notify({
+          type: 'negative',
+          message: 'Payment system not ready',
+          timeout: 3000
+        });
+        return;
+      }
+
       if (this.form.isCardInvalid) {
         this.$q.notify({
           type: 'negative',
@@ -308,29 +384,44 @@ export default {
     },
 
     loadStripeElements() {
-      stripe = window.Stripe(this.stripeKey);
-      const elements = stripe.elements();
-      const style = {
-        base: {
-          color: "#31325F",
-          fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
-          fontSmoothing: "antialiased",
-          fontSize: "16px",
-          "::placeholder": { color: "#CFD7E0" }
+      // Wait for next tick to ensure DOM is ready
+      this.$nextTick(() => {
+        try {
+          stripe = window.Stripe(this.stripeKey);
+          const elements = stripe.elements();
+          const style = {
+            base: {
+              color: "#31325F",
+              fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+              fontSmoothing: "antialiased",
+              fontSize: "16px",
+              "::placeholder": { color: "#CFD7E0" }
+            }
+          };
+
+          card = elements.create("cardNumber", { style });
+          const cardExpiry = elements.create("cardExpiry", { style });
+          const cardCvc = elements.create("cardCvc", { style });
+
+          // Check if elements exist before mounting
+          const cardElement = document.getElementById("card-number-element");
+          const expiryElement = document.getElementById("card-expiry-element");
+          const cvcElement = document.getElementById("card-cvc-element");
+
+          if (cardElement) card.mount("#card-number-element");
+          if (expiryElement) cardExpiry.mount("#card-expiry-element");
+          if (cvcElement) cardCvc.mount("#card-cvc-element");
+
+          card.on("change", this.updateCardFeedback);
+          cardExpiry.on("change", this.updateCardFeedback);
+          cardCvc.on("change", this.updateCardFeedback);
+
+          console.log("Stripe elements loaded successfully");
+        } catch (error) {
+          console.error("Error loading Stripe elements:", error);
+          throw error;
         }
-      };
-
-      card = elements.create("cardNumber", { style });
-      const cardExpiry = elements.create("cardExpiry", { style });
-      const cardCvc = elements.create("cardCvc", { style });
-
-      card.mount("#card-number-element");
-      cardExpiry.mount("#card-expiry-element");
-      cardCvc.mount("#card-cvc-element");
-
-      card.on("change", this.updateCardFeedback);
-      cardExpiry.on("change", this.updateCardFeedback);
-      cardCvc.on("change", this.updateCardFeedback);
+      });
     }
   }
 };
@@ -396,4 +487,7 @@ label > span
 
 .error
   font-size 20px
+
+.wrapper
+  padding 0 1rem
 </style>
