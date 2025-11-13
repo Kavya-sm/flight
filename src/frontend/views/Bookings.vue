@@ -11,9 +11,12 @@
         <div class="booking" v-for="booking in normalizedBookings" :key="booking.id">
           <q-timeline-entry class="booking__entry" icon="flight_takeoff" side="left">
             <h5 slot="subtitle" class="q-timeline-subtitle">
-              <span>
+              <span v-if="booking.flight.departureAirportCode && booking.flight.arrivalAirportCode">
                 {{ booking.flight.departureAirportCode }} → {{ booking.flight.arrivalAirportCode }} &mdash;
                 {{ formatDate(booking.flight.departureDate) }}
+              </span>
+              <span v-else>
+                Flight Details Loading...
               </span>
             </h5>
             
@@ -21,19 +24,19 @@
             <div class="booking-details q-pa-md">
               <div class="row items-center">
                 <div class="col-6 text-center">
-                  <div class="text-h4 text-primary">{{ booking.flight.departureAirportCode }}</div>
-                  <div class="text-caption">Delhi (DEL)</div>
+                  <div class="text-h4 text-primary">{{ booking.flight.departureAirportCode || '---' }}</div>
+                  <div class="text-caption">{{ getAirportName(booking.flight.departureAirportCode) }}</div>
                   <div class="text-caption text-weight-medium">{{ formatTime(booking.flight.departureDate) }}</div>
                 </div>
                 <div class="col-6 text-center">
-                  <div class="text-h4 text-primary">{{ booking.flight.arrivalAirportCode }}</div>
-                  <div class="text-caption">Mumbai (BOM)</div>
+                  <div class="text-h4 text-primary">{{ booking.flight.arrivalAirportCode || '---' }}</div>
+                  <div class="text-caption">{{ getAirportName(booking.flight.arrivalAirportCode) }}</div>
                   <div class="text-caption text-weight-medium">{{ formatTime(booking.flight.arrivalDate) }}</div>
                 </div>
               </div>
               <div class="row justify-center q-mt-sm">
                 <div class="text-caption text-grey">
-                  Flight {{ booking.flight.flightNumber }} • {{ booking.flight.duration || '2h 30m' }}
+                  {{ booking.flight.airline || 'Flight' }} {{ booking.flight.flightNumber || '---' }} • {{ formatDuration(booking.flight.duration) }}
                 </div>
               </div>
               <div class="row justify-center q-mt-sm">
@@ -43,7 +46,12 @@
               </div>
               <div class="row justify-center q-mt-sm">
                 <div class="text-caption text-weight-medium text-primary">
-                  Total: ${{ booking.flight.price || booking.totalPrice || '75' }}
+                  Total: €{{ booking.totalPrice || '---' }}
+                </div>
+              </div>
+              <div class="row justify-center q-mt-sm">
+                <div class="text-caption text-grey">
+                  Passengers: {{ booking.passengersCount }}
                 </div>
               </div>
               <div class="row justify-center q-mt-sm">
@@ -119,6 +127,24 @@ export default {
       }
     },
 
+    formatDuration(durationMinutes) {
+      if (!durationMinutes) return '--h --m';
+      
+      // If it's already a string like "2h 30m", return as-is
+      if (typeof durationMinutes === 'string') {
+        return durationMinutes;
+      }
+      
+      // If it's a number (minutes), format it
+      if (typeof durationMinutes === 'number') {
+        const hours = Math.floor(durationMinutes / 60);
+        const minutes = durationMinutes % 60;
+        return `${hours}h ${minutes}m`;
+      }
+      
+      return '--h --m';
+    },
+
     getStatusColor(status) {
       const statusColors = {
         'confirmed': 'positive',
@@ -127,6 +153,22 @@ export default {
         'completed': 'info'
       };
       return statusColors[status] || 'grey';
+    },
+
+    getAirportName(code) {
+      if (!code) return 'Unknown Airport';
+      
+      const airports = {
+        'DEL': 'Delhi',
+        'BOM': 'Mumbai', 
+        'BLR': 'Bangalore',
+        'MAA': 'Chennai',
+        'HYD': 'Hyderabad',
+        'CCU': 'Kolkata',
+        'AMD': 'Ahmedabad',
+        'GOI': 'Goa'
+      };
+      return airports[code] || `${code} Airport`;
     }
   },
   
@@ -141,24 +183,35 @@ export default {
         return [];
       }
 
+      console.log('Raw bookings from Vuex:', this.bookings);
+
       return this.bookings.map(booking => {
-        // The flight data is in outboundFlight according to the API response
         const flightData = booking.outboundFlight || {};
+        
+        // Debug log for each booking
+        console.log('Processing booking:', {
+          id: booking.id,
+          bookingReference: booking.bookingReference,
+          flightData: flightData,
+          passengers: booking.passengers
+        });
         
         return {
           id: booking.id,
           bookingID: booking.bookingReference || booking.id,
-          status: booking.status,
+          status: booking.status || 'confirmed',
           totalPrice: booking.totalPrice,
+          passengersCount: Array.isArray(booking.passengers) ? booking.passengers.length : 1,
           flight: {
-            // Direct from outboundFlight object
-            departureAirportCode: flightData.departureAirportCode || 'DEL',
-            arrivalAirportCode: flightData.arrivalAirportCode || 'BOM',
-            departureDate: flightData.departureDate || '2025-11-12T08:00:00',
-            arrivalDate: flightData.arrivalDate || '2025-11-12T10:30:00',
-            flightNumber: flightData.flightNumber || 'AI101',
-            price: flightData.price || booking.totalPrice,
-            duration: flightData.duration || '2h 30m'
+            // Use actual data without hardcoded fallbacks
+            departureAirportCode: flightData.departureAirportCode,
+            arrivalAirportCode: flightData.arrivalAirportCode,
+            departureDate: flightData.departureDate,
+            arrivalDate: flightData.arrivalDate,
+            flightNumber: flightData.flightNumber,
+            airline: flightData.airline,
+            price: flightData.ticketPrice || flightData.price,
+            duration: flightData.duration
           }
         };
       });
