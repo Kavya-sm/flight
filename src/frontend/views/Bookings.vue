@@ -8,7 +8,7 @@
     
     <div class="bookings">
       <q-timeline color="secondary" class="q-pl-md">
-        <div class="booking" v-for="booking in normalizedBookings" :key="booking.id">
+        <div class="booking" v-for="(booking, index) in normalizedBookings" :key="booking.id || index">
           <q-timeline-entry class="booking__entry" icon="flight_takeoff" side="left">
             <h5 slot="subtitle" class="q-timeline-subtitle">
               <span v-if="booking.flight.departureAirportCode && booking.flight.arrivalAirportCode">
@@ -16,11 +16,10 @@
                 {{ formatDate(booking.flight.departureDate) }}
               </span>
               <span v-else>
-                Flight Details Loading...
+                Booking {{ index + 1 }}
               </span>
             </h5>
             
-            <!-- Simple flight details display -->
             <div class="booking-details q-pa-md">
               <div class="row items-center">
                 <div class="col-6 text-center">
@@ -41,7 +40,7 @@
               </div>
               <div class="row justify-center q-mt-sm">
                 <div class="text-caption text-grey">
-                  Booking Ref: {{ booking.bookingID }}
+                  Booking Ref: {{ booking.bookingID || booking.bookingReference || '---' }}
                 </div>
               </div>
               <div class="row justify-center q-mt-sm">
@@ -78,7 +77,6 @@ import { mapState, mapGetters } from "vuex";
 
 export default {
   name: "Bookings",
-  components: { },
   
   mounted() {
     if (this.isAuthenticated) {
@@ -129,19 +127,12 @@ export default {
 
     formatDuration(durationMinutes) {
       if (!durationMinutes) return '--h --m';
-      
-      // If it's already a string like "2h 30m", return as-is
-      if (typeof durationMinutes === 'string') {
-        return durationMinutes;
-      }
-      
-      // If it's a number (minutes), format it
+      if (typeof durationMinutes === 'string') return durationMinutes;
       if (typeof durationMinutes === 'number') {
         const hours = Math.floor(durationMinutes / 60);
         const minutes = durationMinutes % 60;
         return `${hours}h ${minutes}m`;
       }
-      
       return '--h --m';
     },
 
@@ -157,16 +148,9 @@ export default {
 
     getAirportName(code) {
       if (!code) return 'Unknown Airport';
-      
       const airports = {
-        'DEL': 'Delhi',
-        'BOM': 'Mumbai', 
-        'BLR': 'Bangalore',
-        'MAA': 'Chennai',
-        'HYD': 'Hyderabad',
-        'CCU': 'Kolkata',
-        'AMD': 'Ahmedabad',
-        'GOI': 'Goa'
+        'DEL': 'Delhi', 'BOM': 'Mumbai', 'BLR': 'Bangalore', 'MAA': 'Chennai',
+        'HYD': 'Hyderabad', 'CCU': 'Kolkata', 'AMD': 'Ahmedabad', 'GOI': 'Goa'
       };
       return airports[code] || `${code} Airport`;
     }
@@ -183,17 +167,18 @@ export default {
         return [];
       }
 
-      console.log('Raw bookings from Vuex:', this.bookings);
+      console.log('Bookings from Vuex:', this.bookings);
 
-      return this.bookings.map(booking => {
+      return this.bookings.map((booking, index) => {
         const flightData = booking.outboundFlight || {};
         
-        // Debug log for each booking
-        console.log('Processing booking:', {
+        console.log(`Booking ${index}:`, {
           id: booking.id,
           bookingReference: booking.bookingReference,
-          flightData: flightData,
-          passengers: booking.passengers
+          status: booking.status,
+          totalPrice: booking.totalPrice,
+          passengers: booking.passengers,
+          flightData: flightData
         });
         
         return {
@@ -203,7 +188,6 @@ export default {
           totalPrice: booking.totalPrice,
           passengersCount: Array.isArray(booking.passengers) ? booking.passengers.length : 1,
           flight: {
-            // Use actual data without hardcoded fallbacks
             departureAirportCode: flightData.departureAirportCode,
             arrivalAirportCode: flightData.arrivalAirportCode,
             departureDate: flightData.departureDate,
@@ -235,10 +219,6 @@ export default {
   border-radius: 8px
   margin-top: 8px
   border: 1px solid $grey-3
-
-.booking__subtitle
-  font-weight: 500
-  margin-bottom: 8px
 
 .wrapper
   padding 0 1rem
