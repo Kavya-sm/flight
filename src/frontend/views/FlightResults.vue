@@ -30,29 +30,27 @@
           </q-popup-edit>
         </q-fab-action>
         <q-fab-action color="secondary" icon="schedule" glossy>
-          <q-popup-edit title="Schedule filter">
-            <q-datetime
-              type="time"
-              format24h
-              format="HH:mm"
-              format-model="date"
-              placeholder="Depart at"
-              clearable
-              @input="setDeparture"
-              v-model="departureTimeFilter"
-              class="filter__departure"
-            />
-            <q-datetime
-              type="time"
-              format24h
-              format="HH:mm"
-              format-model="date"
-              placeholder="Arrive by"
-              clearable
-              @input="setArrival"
-              v-model="arrivalTimeFilter"
-              class="filter__arrival"
-            />
+          <q-popup-edit title="Schedule filter" buttons v-model="timeFilterModel">
+            <div class="time-filters q-pa-md">
+              <div class="text-subtitle1 q-mb-md">Departure Time</div>
+              <q-datetime
+                type="time"
+                format24h
+                placeholder="Depart after"
+                clearable
+                v-model="departureTimeFilter"
+                class="filter__departure q-mb-md full-width"
+              />
+              <div class="text-subtitle1 q-mb-md">Arrival Time</div>
+              <q-datetime
+                type="time"
+                format24h
+                placeholder="Arrive before"
+                clearable
+                v-model="arrivalTimeFilter"
+                class="filter__arrival full-width"
+              />
+            </div>
           </q-popup-edit>
         </q-fab-action>
         <q-fab-action
@@ -148,9 +146,10 @@ export default {
   data() {
     return {
       filteredFlights: [],
-      departureTimeFilter: "",
-      arrivalTimeFilter: "",
-      maxPriceFilter: 300
+      departureTimeFilter: null,
+      arrivalTimeFilter: null,
+      maxPriceFilter: 300,
+      timeFilterModel: "time" // Dummy model for popup
     };
   },
   mounted() {
@@ -159,6 +158,13 @@ export default {
     }
   },
   watch: {
+    // Watch for time filter changes and apply filters automatically
+    departureTimeFilter(newVal) {
+      this.applyTimeFilters();
+    },
+    arrivalTimeFilter(newVal) {
+      this.applyTimeFilters();
+    },
     // Reload flights when route parameters change
     '$route.query': {
       handler(newQuery) {
@@ -186,9 +192,8 @@ export default {
             paginationToken: this.paginationToken
           });
 
-          // Use unique flights to avoid duplicates
-          this.filteredFlights = this.sortByDeparture(this.uniqueFlights);
-          console.log("Filtered flights:", this.filteredFlights);
+          // Apply any existing filters when loading new flights
+          this.applyAllFilters();
         }
       } catch (error) {
         console.error("Error loading flights:", error);
@@ -197,26 +202,48 @@ export default {
         );
       }
     },
+
+    applyAllFilters() {
+      let flights = this.uniqueFlights;
+      
+      // Apply price filter
+      flights = this.filterByMaxPrice(flights, this.maxPriceFilter);
+      
+      // Apply time filters
+      flights = this.applyTimeFiltersToFlights(flights);
+      
+      this.filteredFlights = this.sortByDeparture(flights);
+    },
+
+    applyTimeFilters() {
+      let flights = this.uniqueFlights;
+      
+      // Apply price filter first
+      flights = this.filterByMaxPrice(flights, this.maxPriceFilter);
+      
+      // Apply time filters
+      flights = this.applyTimeFiltersToFlights(flights);
+      
+      this.filteredFlights = this.sortByDeparture(flights);
+    },
+
+    applyTimeFiltersToFlights(flights) {
+      if (this.departureTimeFilter || this.arrivalTimeFilter) {
+        return this.filterBySchedule(flights, {
+          departure: this.departureTimeFilter,
+          arrival: this.arrivalTimeFilter
+        });
+      }
+      return flights;
+    },
+
     setPrice() {
-      let flights = this.filterByMaxPrice(this.uniqueFlights, this.maxPriceFilter);
-      flights = this.sortByPrice(flights);
-      this.filteredFlights = flights;
+      this.applyAllFilters();
     },
-    setDeparture() {
-      let flights = this.filterBySchedule(this.uniqueFlights, {
-        departure: this.departureTimeFilter
-      });
-      flights = this.sortByDeparture(flights);
-      this.filteredFlights = flights;
-    },
-    setArrival() {
-      this.filteredFlights = this.filterBySchedule(this.uniqueFlights, {
-        arrival: this.arrivalTimeFilter
-      });
-    },
+
     resetFilters() {
-      this.departureTimeFilter = "";
-      this.arrivalTimeFilter = "";
+      this.departureTimeFilter = null;
+      this.arrivalTimeFilter = null;
       this.maxPriceFilter = 300;
       this.filteredFlights = this.sortByDeparture(this.uniqueFlights);
     }
@@ -260,4 +287,11 @@ export default {
 
 .loader
   width 150%
+
+.time-filters
+  min-width: 300px
+  
+.filter__departure,
+.filter__arrival
+  width: 100%
 </style>
