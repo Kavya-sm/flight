@@ -68,24 +68,51 @@ export default {
           "https://sywyfyg7aj.execute-api.ap-south-1.amazonaws.com/1_aerochat_prod/chat",
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+              "Content-Type": "application/json",
+            },
             body: JSON.stringify({ message: text }),
           }
         );
 
-        let data = {};
-        try {
-          data = await response.json();
-        } catch (jsonError) {
-          console.warn("Failed to parse bot response JSON:", jsonError);
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const botReply = data?.reply || "Sorry, I couldn’t get that.";
+        const data = await response.json();
+        console.log('Full response data:', data);
+
+        // Extract message from Lex response structure
+        let botReply = "Sorry, I couldn't process that.";
+        
+        if (data.messages && data.messages.length > 0) {
+          // Combine all messages from Lex
+          botReply = data.messages.map(msg => msg.content).join(' ');
+        } else if (data.body) {
+          // If response is wrapped in body string (stringified JSON)
+          try {
+            const bodyData = JSON.parse(data.body);
+            if (bodyData.messages && bodyData.messages.length > 0) {
+              botReply = bodyData.messages.map(msg => msg.content).join(' ');
+            }
+          } catch (e) {
+            console.warn('Failed to parse body:', e);
+          }
+        } else if (data.reply) {
+          // Fallback to direct reply field
+          botReply = data.reply;
+        }
+
         this.messages.push({ text: botReply, sender: "bot" });
 
       } catch (error) {
         console.error("Chatbot fetch error:", error);
-        this.messages.push({ text: "Error connecting to the bot.", sender: "bot" });
+        this.messages.push({ 
+          text: "Error connecting to the bot. Please try again.", 
+          sender: "bot" 
+        });
       } finally {
         this.isLoading = false;
         this.scrollToBottom();
@@ -97,32 +124,6 @@ export default {
       this.scrollToBottom();
     },
   },
-};
-
-// --- HACK: Intercept fetch to fix body key 'message' → 'text' for Lex Lambda ---
-const originalFetch = window.fetch;
-window.fetch = async (...args) => {
-  if (
-    args[0] ===
-    "https://sywyfyg7aj.execute-api.ap-south-1.amazonaws.com/1_aerochat_prod/chat"
-  ) {
-    try {
-      let options = args[1] || {};
-      if (options.body) {
-        let bodyObj = JSON.parse(options.body);
-        // Rename 'message' to 'text'
-        if (bodyObj.message) {
-          bodyObj.text = bodyObj.message;
-          delete bodyObj.message;
-          options.body = JSON.stringify(bodyObj);
-        }
-      }
-      args[1] = options;
-    } catch (e) {
-      console.warn("Fetch body hack failed:", e);
-    }
-  }
-  return originalFetch(...args);
 };
 </script>
 
@@ -217,4 +218,5 @@ window.fetch = async (...args) => {
   cursor: pointer;
 }
 </style>
+
 
