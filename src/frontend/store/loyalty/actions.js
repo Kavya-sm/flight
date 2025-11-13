@@ -9,7 +9,7 @@ const LOYALTY_API_URL =
  */
 export async function fetchLoyalty({ commit, rootState }) {
   Loading.show({
-    message: "Loading loyalty data...",
+    message: "Loading loyalty data..."
   });
 
   try {
@@ -32,8 +32,8 @@ export async function fetchLoyalty({ commit, rootState }) {
       {
         method: "GET",
         headers: {
-          "Content-Type": "application/json",
-        },
+          "Content-Type": "application/json"
+        }
       }
     );
 
@@ -80,16 +80,15 @@ export async function addLoyaltyPoints({ commit, rootState }, points) {
       {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          pointsToAdd: points,
-        }),
+          pointsToAdd: points
+        })
       }
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
       throw new Error(
         `Failed to add points: ${response.status} ${response.statusText}`
       );
