@@ -186,4 +186,4 @@ export async function fetchLoyaltyInfo({ commit, rootState }, { userId }) {
     console.error("Fetch loyalty error:", error);
     throw error;
   }
-}
+} 
