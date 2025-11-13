@@ -88,6 +88,3 @@ export default class Flight {
     return departureDayMonthYear;
   }
 }
-    return departureDayMonthYear;
-  }
-}
