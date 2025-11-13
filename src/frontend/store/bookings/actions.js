@@ -44,8 +44,10 @@ export async function createBooking({ commit, rootState }, { outboundFlight, pas
     // Transform the API response to match front-end format
     if (result.success) {
       const transformedBooking = {
-        bookingID: result.bookingId || result.booking?.id,
-        flight: {
+        id: result.bookingId || result.booking?.id,
+        bookingReference: result.bookingId || result.booking?.id,
+        createdAt: new Date().toISOString(),
+        outboundFlight: {
           id: outboundFlight.id,
           departureAirportCode: outboundFlight.departureAirportCode,
           arrivalAirportCode: outboundFlight.arrivalAirportCode,
@@ -57,7 +59,9 @@ export async function createBooking({ commit, rootState }, { outboundFlight, pas
           ticketPrice: outboundFlight.ticketPrice,
           ticketCurrency: outboundFlight.ticketCurrency,
           flightNumber: outboundFlight.flightNumber
-        }
+        },
+        totalPrice: outboundFlight.ticketPrice * passengers.length,
+        status: 'confirmed'
       };
       
       console.log("Transformed booking for Vuex:", transformedBooking);
@@ -98,30 +102,9 @@ export async function fetchBookings({ commit, rootState }) {
     console.log("Bookings API response:", result);
 
     if (result.bookings && Array.isArray(result.bookings)) {
-      // Transform each booking to match front-end format
-      const transformedBookings = result.bookings.map(booking => {
-        console.log("Raw booking from API:", booking);
-        
-        return {
-          bookingID: booking.bookingID || booking.bookingId || booking.id,
-          flight: {
-            id: booking.flight?.id || booking.flightId,
-            departureAirportCode: booking.flight?.departureAirportCode || booking.flightDetails?.from,
-            arrivalAirportCode: booking.flight?.arrivalAirportCode || booking.flightDetails?.to,
-            departureDate: booking.flight?.departureDate || booking.flightDetails?.departure,
-            arrivalDate: booking.flight?.arrivalDate || booking.flightDetails?.arrival,
-            departureAirportName: booking.flight?.departureAirportName || `${booking.flightDetails?.from} Airport`,
-            arrivalAirportName: booking.flight?.arrivalAirportName || `${booking.flightDetails?.to} Airport`,
-            airline: booking.flight?.airline || booking.flightDetails?.airline,
-            ticketPrice: booking.flight?.ticketPrice || booking.flightDetails?.price,
-            ticketCurrency: booking.flight?.ticketCurrency || "EUR",
-            flightNumber: booking.flight?.flightNumber || booking.flightId
-          }
-        };
-      });
-      
-      console.log("Transformed bookings for Vuex:", transformedBookings);
-      commit("SET_BOOKINGS", transformedBookings);
+      // The API already returns bookings in the correct format with outboundFlight
+      console.log("Transformed bookings for Vuex:", result.bookings);
+      commit("SET_BOOKINGS", result.bookings);
     } else {
       console.log("No bookings found or invalid format");
       commit("SET_BOOKINGS", []);
