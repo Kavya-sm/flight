@@ -1,4 +1,3 @@
-
 <template>
   <q-page>
     <div class="wrapper">
@@ -23,18 +22,18 @@
               <div class="row items-center">
                 <div class="col-6 text-center">
                   <div class="text-h4 text-primary">{{ booking.flight.departureAirportCode }}</div>
-                  <div class="text-caption">Delhi (DEL)</div>
+                  <div class="text-caption">{{ getCityName(booking.flight.departureAirportCode) }} ({{ booking.flight.departureAirportCode }})</div>
                   <div class="text-caption text-weight-medium">{{ formatTime(booking.flight.departureDate) }}</div>
                 </div>
                 <div class="col-6 text-center">
                   <div class="text-h4 text-primary">{{ booking.flight.arrivalAirportCode }}</div>
-                  <div class="text-caption">Mumbai (BOM)</div>
+                  <div class="text-caption">{{ getCityName(booking.flight.arrivalAirportCode) }} ({{ booking.flight.arrivalAirportCode }})</div>
                   <div class="text-caption text-weight-medium">{{ formatTime(booking.flight.arrivalDate) }}</div>
                 </div>
               </div>
               <div class="row justify-center q-mt-sm">
                 <div class="text-caption text-grey">
-                  Flight {{ booking.flight.flightNumber }} • {{ booking.flight.duration || '2h 30m' }}
+                  Flight {{ booking.flight.flightNumber }} • {{ booking.flight.duration }}
                 </div>
               </div>
               <div class="row justify-center q-mt-sm">
@@ -44,12 +43,12 @@
               </div>
               <div class="row justify-center q-mt-sm">
                 <div class="text-caption text-weight-medium text-primary">
-                  Total: ${{ booking.flight.price || booking.totalPrice || '75' }}
+                  Total: ${{ booking.totalPrice }}
                 </div>
               </div>
               <div class="row justify-center q-mt-sm">
                 <q-badge :color="getStatusColor(booking.status)" class="q-px-sm q-py-xs">
-                  {{ booking.status || 'confirmed' }}
+                  {{ booking.status }}
                 </q-badge>
               </div>
             </div>
@@ -71,11 +70,11 @@
 
 <script>
 import { mapState, mapGetters } from "vuex";
-import LexChatBot from "../components/LexChatBot.vue"; // ✅ Updated import for src/frontend/components
+import LexChatBot from "../components/LexChatBot.vue";
 
 export default {
   name: "Bookings",
-  components: { LexChatBot }, // ✅ Bot registered here
+  components: { LexChatBot },
   
   mounted() {
     if (this.isAuthenticated) {
@@ -132,6 +131,37 @@ export default {
         'completed': 'info'
       };
       return statusColors[status] || 'grey';
+    },
+
+    calculateDuration(departure, arrival) {
+      if (!departure || !arrival) return '2h 30m';
+      
+      try {
+        const dep = new Date(departure);
+        const arr = new Date(arrival);
+        const diffMs = arr - dep;
+        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+        const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        
+        return `${hours}h ${minutes}m`;
+      } catch (e) {
+        return '2h 30m';
+      }
+    },
+
+    getCityName(airportCode) {
+      const cities = {
+        'DEL': 'Delhi',
+        'BOM': 'Mumbai', 
+        'BLR': 'Bangalore',
+        'MAA': 'Chennai',
+        'HYD': 'Hyderabad',
+        'CCU': 'Kolkata',
+        'AMD': 'Ahmedabad',
+        'PNQ': 'Pune',
+        'GOI': 'Goa'
+      };
+      return cities[airportCode] || airportCode;
     }
   },
   
@@ -146,22 +176,49 @@ export default {
         return [];
       }
 
+      console.log("Raw bookings data:", this.bookings);
+      
       return this.bookings.map(booking => {
+        console.log("Processing booking:", booking);
+        console.log("Outbound flight data:", booking.outboundFlight);
+
+        // Use outboundFlight data from API
         const flightData = booking.outboundFlight || {};
         
+        // If outboundFlight doesn't exist, try to extract from other fields
+        if (!flightData.departureAirportCode && booking.flightDetails) {
+          // Fallback to flightDetails if outboundFlight is missing
+          return {
+            id: booking.id,
+            bookingID: booking.bookingReference || booking.id,
+            status: booking.status || 'confirmed',
+            totalPrice: booking.totalPrice || booking.flightDetails?.price || 0,
+            flight: {
+              departureAirportCode: booking.flightDetails.from,
+              arrivalAirportCode: booking.flightDetails.to,
+              departureDate: booking.flightDetails.departure,
+              arrivalDate: booking.flightDetails.arrival,
+              flightNumber: booking.flightDetails.airline + ' ' + (flightData.flightNumber || booking.flightId || ''),
+              price: booking.flightDetails.price,
+              duration: this.calculateDuration(booking.flightDetails.departure, booking.flightDetails.arrival)
+            }
+          };
+        }
+        
+        // Normal case with outboundFlight data
         return {
           id: booking.id,
           bookingID: booking.bookingReference || booking.id,
-          status: booking.status,
-          totalPrice: booking.totalPrice,
+          status: booking.status || 'confirmed',
+          totalPrice: booking.totalPrice || flightData.ticketPrice || 0,
           flight: {
-            departureAirportCode: flightData.departureAirportCode || 'DEL',
-            arrivalAirportCode: flightData.arrivalAirportCode || 'BOM',
-            departureDate: flightData.departureDate || '2025-11-12T08:00:00',
-            arrivalDate: flightData.arrivalDate || '2025-11-12T10:30:00',
-            flightNumber: flightData.flightNumber || 'AI101',
-            price: flightData.price || booking.totalPrice,
-            duration: flightData.duration || '2h 30m'
+            departureAirportCode: flightData.departureAirportCode,
+            arrivalAirportCode: flightData.arrivalAirportCode,
+            departureDate: flightData.departureDate,
+            arrivalDate: flightData.arrivalDate,
+            flightNumber: flightData.flightNumber || flightData.airline + ' ' + (flightData.id || ''),
+            price: flightData.ticketPrice || booking.totalPrice,
+            duration: this.calculateDuration(flightData.departureDate, flightData.arrivalDate)
           }
         };
       });
