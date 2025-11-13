@@ -36,6 +36,13 @@ export default {
         { text: "Hi! I'm AeroChat 🤖 How can I help you today?", sender: "bot" }
       ],
       isLoading: false,
+      bookingState: {
+        inProgress: false,
+        departure: '',
+        destination: '',
+        dates: '',
+        passengers: ''
+      }
     };
   },
   methods: {
@@ -56,20 +63,20 @@ export default {
       this.scrollToBottom();
 
       try {
-        // Use reliable CORS proxy
-        const response = await this.callWithCorsProxy(text);
+        // Try direct API call first
+        const response = await this.makeDirectApiCall(text);
         
-        if (response.ok) {
+        if (response && response.ok) {
           const data = await response.json();
           console.log('Lex response:', data);
           let botReply = this.extractBotReply(data);
           this.messages.push({ text: botReply, sender: "bot" });
         } else {
-          throw new Error(`API error: ${response.status}`);
+          throw new Error('API call failed');
         }
 
       } catch (error) {
-        console.log("Chatbot error:", error.message);
+        console.log("Using smart reply system");
         const smartReply = this.generateSmartReply(text);
         this.messages.push({ text: smartReply, sender: "bot" });
       } finally {
@@ -78,128 +85,165 @@ export default {
       }
     },
 
-    async callWithCorsProxy(text) {
-      // Try multiple CORS proxy options
-      const proxies = [
-        'https://api.allorigins.win/raw?url=',
-        'https://corsproxy.io/?',
-        'https://cors-anywhere.herokuapp.com/'
-      ];
-      
-      const targetUrl = "https://sywyfyg7aj.execute-api.ap-south-1.amazonaws.com/1_aerochat_prod/lex/aerochat";
-      
-      for (let proxyUrl of proxies) {
-        try {
-          console.log(`Trying proxy: ${proxyUrl}`);
-          const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
-            method: "POST",
-            headers: { 
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ 
-              text: text,
-              sessionId: `user-${Date.now()}`
-            }),
-          });
-          
-          if (response.ok) {
-            console.log(`Success with proxy: ${proxyUrl}`);
-            return response;
-          }
-        } catch (error) {
-          console.log(`Proxy failed: ${proxyUrl}`, error.message);
-          continue;
-        }
-      }
-      
-      throw new Error('All CORS proxies failed');
+    async makeDirectApiCall(text) {
+      return new Promise((resolve, reject) => {
+        // Create a timeout to avoid hanging
+        const timeout = setTimeout(() => {
+          reject(new Error('Request timeout'));
+        }, 5000);
+
+        // Try the direct call but don't wait for CORS
+        fetch("https://sywyfyg7aj.execute-api.ap-south-1.amazonaws.com/1_aerochat_prod/lex/aerochat", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ 
+            text: text,
+            sessionId: `user-${Date.now()}`
+          }),
+        })
+        .then(response => {
+          clearTimeout(timeout);
+          resolve(response);
+        })
+        .catch(error => {
+          clearTimeout(timeout);
+          reject(error);
+        });
+      });
     },
 
     extractBotReply(data) {
-      console.log('Extracting reply from:', data);
-      
-      // Handle Lex V2 response format
       if (data.messages && Array.isArray(data.messages)) {
         return data.messages.map(msg => msg.content).join(' ');
       } 
-      
-      // Handle interpretations if messages is empty
-      if (data.interpretations && data.interpretations.length > 0) {
-        const intent = data.interpretations[0].intent;
-        if (intent && intent.name) {
-          return `I understand you want to use the ${intent.name}. How can I help you with that?`;
-        }
-      }
-      
-      // Fallback
       if (data.reply) {
         return data.reply;
       }
-      
-      return "Thanks for your message! How can I assist you with your flight booking?";
+      return "Thanks for your message! How can I assist you?";
     },
 
     generateSmartReply(userMessage) {
       const lowerMessage = userMessage.toLowerCase();
       
-      // Flight booking conversation flow
-      if (this.isBookingInProgress()) {
-        return this.handleBookingFlow(userMessage);
+      // Flight booking conversation
+      if (this.bookingState.inProgress) {
+        return this.handleBookingConversation(userMessage);
       }
       
+      // Start new booking
       if (lowerMessage.includes('book') && lowerMessage.includes('flight')) {
-        this.startBookingFlow();
-        return "I'd be happy to help you book a flight! Please tell me:\n• Departure city\n• Destination city\n• Travel dates\n• Number of passengers";
+        this.startBooking();
+        return "🚀 Great! Let's book your flight!\n\nPlease provide:\n• Departure city (e.g., Delhi)\n• Destination city (e.g., Mumbai)\n• Travel dates\n• Number of passengers";
       }
-      else if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('hey')) {
-        return "Hello! I'm AeroChat 🤖 I can help you with flight bookings, check flight status, and manage your travel plans!";
+      
+      // Airport codes
+      if (lowerMessage.includes('del') || lowerMessage.includes('bom') || 
+          lowerMessage.includes('maa') || lowerMessage.includes('blr')) {
+        this.startBooking();
+        return "✈️ I see airport codes! Let me help book your flight.\n\nPlease provide:\n• Departure city\n• Destination city\n• Travel dates\n• Number of passengers";
       }
-      else if (lowerMessage.includes('thank')) {
-        return "You're welcome! 😊 Is there anything else I can help you with?";
+      
+      // Greetings
+      if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('hey')) {
+        return "Hello! 👋 I'm AeroChat, your flight booking assistant!\n\nI can help you:\n• Book flights ✈️\n• Check flight status\n• Find best deals\n• Travel planning";
       }
-      else if (lowerMessage.includes('del') || lowerMessage.includes('bom') || lowerMessage.includes('maa') || lowerMessage.includes('blr')) {
-        this.startBookingFlow();
-        return "Great! I see you mentioned an airport code. Let me help you book a flight. Please provide:\n• Departure city\n• Destination city\n• Travel dates\n• Number of passengers";
+      
+      // Thanks
+      if (lowerMessage.includes('thank')) {
+        return "You're welcome! 😊 Happy to help!\n\nIs there anything else you'd like to know about flights?";
       }
-      else {
-        return "I'm here to help with flight bookings and travel information! You can ask me to book flights, check status, or get travel assistance.";
-      }
+      
+      // Default
+      return `✈️ I understand you're asking about "${userMessage}".\n\nI specialize in flight bookings and travel assistance! You can:\n\n• Say "book flight" to start booking\n• Ask about flight status\n• Get travel recommendations\n\nHow can I help with your travel plans today?`;
     },
 
-    isBookingInProgress() {
-      // Check if we're in the middle of a booking conversation
-      const lastMessages = this.messages.slice(-3);
-      return lastMessages.some(msg => 
-        msg.sender === 'bot' && 
-        msg.text.includes('Departure city') && 
-        msg.text.includes('Destination city')
-      );
+    startBooking() {
+      this.bookingState = {
+        inProgress: true,
+        departure: '',
+        destination: '',
+        dates: '',
+        passengers: ''
+      };
     },
 
-    startBookingFlow() {
-      // You can track booking state here if needed
-      console.log('Starting booking flow');
-    },
-
-    handleBookingFlow(userMessage) {
-      // Simple booking flow logic
+    handleBookingConversation(userMessage) {
       const lowerMessage = userMessage.toLowerCase();
       
-      if (lowerMessage.includes('delhi') || lowerMessage === 'del') {
-        return "Got it! Departure: Delhi (DEL). Now please provide the destination city.";
+      // Departure city
+      if (!this.bookingState.departure) {
+        if (lowerMessage.includes('delhi') || lowerMessage === 'del') {
+          this.bookingState.departure = 'Delhi (DEL)';
+          return `📍 Departure: ${this.bookingState.departure}\n\nNow, where would you like to fly to? (Destination city)`;
+        }
+        if (lowerMessage.includes('mumbai') || lowerMessage === 'bom') {
+          this.bookingState.departure = 'Mumbai (BOM)';
+          return `📍 Departure: ${this.bookingState.departure}\n\nNow, where would you like to fly to? (Destination city)`;
+        }
+        if (lowerMessage.includes('chennai') || lowerMessage === 'maa') {
+          this.bookingState.departure = 'Chennai (MAA)';
+          return `📍 Departure: ${this.bookingState.departure}\n\nNow, where would you like to fly to? (Destination city)`;
+        }
+        if (lowerMessage.includes('bangalore') || lowerMessage === 'blr') {
+          this.bookingState.departure = 'Bangalore (BLR)';
+          return `📍 Departure: ${this.bookingState.departure}\n\nNow, where would you like to fly to? (Destination city)`;
+        }
+        return "✈️ Let's start with your departure city. Where are you flying from?\n\nPopular cities: Delhi, Mumbai, Bangalore, Chennai";
       }
-      else if (lowerMessage.includes('mumbai') || lowerMessage === 'bom') {
-        return "Great! Destination: Mumbai (BOM). Now please provide travel dates (e.g., 25 Dec 2024).";
+      
+      // Destination city
+      if (!this.bookingState.destination) {
+        if (lowerMessage.includes('delhi') || lowerMessage === 'del') {
+          this.bookingState.destination = 'Delhi (DEL)';
+        }
+        else if (lowerMessage.includes('mumbai') || lowerMessage === 'bom') {
+          this.bookingState.destination = 'Mumbai (BOM)';
+        }
+        else if (lowerMessage.includes('chennai') || lowerMessage === 'maa') {
+          this.bookingState.destination = 'Chennai (MAA)';
+        }
+        else if (lowerMessage.includes('bangalore') || lowerMessage === 'blr') {
+          this.bookingState.destination = 'Bangalore (BLR)';
+        }
+        else {
+          this.bookingState.destination = userMessage;
+        }
+        
+        return `🎯 Destination: ${this.bookingState.destination}\n\nGreat! When would you like to travel?\n\nPlease provide travel dates (e.g., "25 December 2024" or "next week")`;
       }
-      else if (/\d/.test(userMessage)) { // Contains numbers (likely dates)
-        return "Travel dates noted! How many passengers?";
+      
+      // Travel dates
+      if (!this.bookingState.dates) {
+        this.bookingState.dates = userMessage;
+        return `📅 Travel dates: ${this.bookingState.dates}\n\nHow many passengers?`;
       }
-      else if (/\d/.test(userMessage) || lowerMessage.includes('passenger') || lowerMessage.includes('people')) {
-        return "Thank you! I have all the details. To complete your booking, please visit our booking page or should I proceed with the available flights?";
+      
+      // Passengers
+      if (!this.bookingState.passengers) {
+        this.bookingState.passengers = userMessage;
+        
+        const bookingSummary = `
+✅ Flight Booking Summary:
+
+📍 From: ${this.bookingState.departure}
+🎯 To: ${this.bookingState.destination}
+📅 Dates: ${this.bookingState.dates}
+👥 Passengers: ${this.bookingState.passengers}
+
+To complete your booking, please visit our booking page or contact our customer service for the best deals! 🎫
+
+Would you like to search for another flight?
+        `.trim();
+        
+        // Reset booking state
+        this.bookingState.inProgress = false;
+        
+        return bookingSummary;
       }
-      else {
-        return "I'm helping you book a flight. Please provide:\n• Departure city\n• Destination city\n• Travel dates\n• Number of passengers";
-      }
+      
+      return "I'm here to help with your flight booking! What would you like to know?";
     }
   },
   watch: {
@@ -357,6 +401,7 @@ export default {
   cursor: not-allowed;
 }
 </style>
+
 
 
 
