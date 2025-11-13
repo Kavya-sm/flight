@@ -1,24 +1,17 @@
 <template>
   <div class="chatbot-container">
-    <!-- Chat button -->
-    <div v-if="!isOpen" class="chatbot-button" @click="isOpen = true">
-      💬
-    </div>
-
-    <!-- Chat window -->
+    <div v-if="!isOpen" class="chatbot-button" @click="isOpen = true">💬</div>
     <div v-else class="chatbot-window">
       <div class="chatbot-header">
         <span>AeroChat Assistant</span>
         <button class="close-btn" @click="isOpen = false">×</button>
       </div>
-
       <div class="chatbot-messages" ref="messagesContainer">
         <div v-for="(msg, index) in messages" :key="index" :class="['message', msg.sender]">
           {{ msg.text }}
         </div>
         <div v-if="isLoading" class="message bot">Typing...</div>
       </div>
-
       <div class="chatbot-input">
         <input
           v-model="userInput"
@@ -57,57 +50,102 @@ export default {
       const text = this.userInput.trim();
       if (!text || this.isLoading) return;
 
-      // Add user message
       this.messages.push({ text, sender: "user" });
       this.userInput = "";
       this.isLoading = true;
       this.scrollToBottom();
 
       try {
-        // Use the CORRECT endpoint that matches your API Gateway routes
-        const apiUrl = "https://sywyfyg7aj.execute-api.ap-south-1.amazonaws.com/1_aerochat_prod/lex/aerochat";
-        
-        const response = await fetch(apiUrl, {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ message: text }),
-        });
+        const response = await fetch(
+          "https://sywyfyg7aj.execute-api.ap-south-1.amazonaws.com/1_aerochat_prod/lex/aerochat",
+          {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ 
+              text: text,  // ✅ Changed to 'text' to match Lambda
+              sessionId: `user-${Date.now()}`
+            }),
+          }
+        );
 
         console.log('Response status:', response.status);
         
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Lex response:', data);
+          let botReply = this.extractBotReply(data);
+          this.messages.push({ text: botReply, sender: "bot" });
+        } else {
+          throw new Error(`HTTP error: ${response.status}`);
         }
-
-        const data = await response.json();
-        console.log('Full response data:', data);
-
-        // Extract message from Lex response structure
-        let botReply = "I'm here to help with flight bookings!";
-        
-        if (data.messages && data.messages.length > 0) {
-          botReply = data.messages.map(msg => msg.content).join(' ');
-        } else if (data.reply) {
-          botReply = data.reply;
-        }
-
-        this.messages.push({ text: botReply, sender: "bot" });
 
       } catch (error) {
-        console.error("Chatbot fetch error:", error);
-        
-        // Fallback response
-        this.messages.push({ 
-          text: "I can help you book flights! Try: 'Book a flight from Delhi to Mumbai'", 
-          sender: "bot" 
-        });
+        console.log("Chatbot error:", error.message);
+        const smartReply = this.generateSmartReply(text);
+        this.messages.push({ text: smartReply, sender: "bot" });
       } finally {
         this.isLoading = false;
         this.scrollToBottom();
       }
     },
+
+    extractBotReply(data) {
+      console.log('Extracting reply from:', data);
+      
+      // Handle Lex V2 response format
+      if (data.messages && Array.isArray(data.messages)) {
+        return data.messages.map(msg => msg.content).join(' ');
+      } 
+      
+      // Handle interpretations if messages is empty
+      if (data.interpretations && data.interpretations.length > 0) {
+        const intent = data.interpretations[0].intent;
+        if (intent && intent.name) {
+          return `I understand you want to use the ${intent.name}. How can I help you with that?`;
+        }
+      }
+      
+      // Fallback
+      if (data.reply) {
+        return data.reply;
+      }
+      
+      return "Thanks for your message! How can I assist you with your flight booking?";
+    },
+
+    generateSmartReply(userMessage) {
+      const lowerMessage = userMessage.toLowerCase();
+      
+      if (lowerMessage.includes('book') && lowerMessage.includes('flight')) {
+        if (lowerMessage.includes('del') && lowerMessage.includes('bom')) {
+          return "I can help you book a flight from Delhi to Mumbai! Please provide:\n• Travel dates\n• Number of passengers\n• Preferred time";
+        }
+        if (lowerMessage.includes('del') || lowerMessage.includes('bom') || lowerMessage.includes('maa') || lowerMessage.includes('blr')) {
+          return "I can help with flight booking! Please specify:\n• Departure city\n• Destination city\n• Travel dates\n• Number of passengers";
+        }
+        return "I'd be happy to help you book a flight! Please tell me:\n• Departure city\n• Destination city\n• Travel dates\n• Number of passengers";
+      }
+      else if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('hey')) {
+        return "Hello! I'm AeroChat 🤖 I can help you with:\n• Flight bookings\n• Flight status\n• Booking management\n• Travel information\n\nHow can I assist you today?";
+      }
+      else if (lowerMessage.includes('thank')) {
+        return "You're welcome! 😊 Is there anything else I can help you with?";
+      }
+      else if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('fare')) {
+        return "I can check flight prices for you! Please specify:\n• Route (e.g., Delhi to Mumbai)\n• Travel dates\n• Number of passengers";
+      }
+      else if (lowerMessage.includes('status') || lowerMessage.includes('check')) {
+        return "To check your booking status, please visit the 'My Bookings' section in your account or provide your booking reference number.";
+      }
+      else if (lowerMessage.includes('cancel')) {
+        return "I can help with cancellation! Please provide your booking reference number or visit the 'My Bookings' section.";
+      }
+      else {
+        return `I understand you're asking about: "${userMessage}". I'm AeroChat, your flight booking assistant. I can help you with:\n\n• Booking new flights\n• Checking flight status\n• Managing existing bookings\n• Flight information\n\nHow can I assist you with your travel plans?`;
+      }
+    }
   },
   watch: {
     messages() {
@@ -137,6 +175,7 @@ export default {
   font-size: 28px;
   cursor: pointer;
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
 }
 
 .chatbot-button:hover {
@@ -177,6 +216,7 @@ export default {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+  transition: background-color 0.2s;
 }
 
 .close-btn:hover {
@@ -197,6 +237,7 @@ export default {
   max-width: 85%;
   word-wrap: break-word;
   line-height: 1.4;
+  white-space: pre-line;
 }
 
 .message.user {
@@ -229,6 +270,7 @@ export default {
   outline: none;
   padding: 10px 16px;
   font-size: 14px;
+  transition: border-color 0.2s;
 }
 
 .chatbot-input input:focus {
@@ -237,6 +279,7 @@ export default {
 
 .chatbot-input input:disabled {
   background-color: #f5f5f5;
+  cursor: not-allowed;
 }
 
 .chatbot-input button {
