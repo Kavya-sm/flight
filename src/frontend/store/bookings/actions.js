@@ -44,17 +44,8 @@ export async function createBooking({ commit, rootState }, { outboundFlight, pas
     // Transform the API response to match front-end format
     if (result.success) {
       const transformedBooking = {
-        // Include all original booking data from API
-        ...result.booking,
-        id: result.booking?.id || result.bookingId,
-        bookingReference: result.booking?.bookingReference || result.bookingId,
-        status: result.booking?.status || 'confirmed',
-        totalPrice: result.booking?.totalPrice,
-        passengers: result.booking?.passengers || passengers,
-        createdAt: result.booking?.createdAt || new Date().toISOString(),
-        
-        // Transform flight data
-        outboundFlight: result.booking?.outboundFlight || {
+        bookingID: result.bookingId || result.booking?.id,
+        flight: {
           id: outboundFlight.id,
           departureAirportCode: outboundFlight.departureAirportCode,
           arrivalAirportCode: outboundFlight.arrivalAirportCode,
@@ -65,8 +56,7 @@ export async function createBooking({ commit, rootState }, { outboundFlight, pas
           airline: outboundFlight.airline,
           ticketPrice: outboundFlight.ticketPrice,
           ticketCurrency: outboundFlight.ticketCurrency,
-          flightNumber: outboundFlight.flightNumber,
-          duration: outboundFlight.duration
+          flightNumber: outboundFlight.flightNumber
         }
       };
       
@@ -113,13 +103,8 @@ export async function fetchBookings({ commit, rootState }) {
         console.log("Raw booking from API:", booking);
         
         return {
-          // Preserve all original booking data
-          ...booking,
-          id: booking.id || booking.bookingId,
-          bookingReference: booking.bookingReference || booking.bookingId,
-          
-          // Transform flight data to outboundFlight structure
-          outboundFlight: {
+          bookingID: booking.bookingID || booking.bookingId || booking.id,
+          flight: {
             id: booking.flight?.id || booking.flightId,
             departureAirportCode: booking.flight?.departureAirportCode || booking.flightDetails?.from,
             arrivalAirportCode: booking.flight?.arrivalAirportCode || booking.flightDetails?.to,
@@ -130,8 +115,7 @@ export async function fetchBookings({ commit, rootState }) {
             airline: booking.flight?.airline || booking.flightDetails?.airline,
             ticketPrice: booking.flight?.ticketPrice || booking.flightDetails?.price,
             ticketCurrency: booking.flight?.ticketCurrency || "EUR",
-            flightNumber: booking.flight?.flightNumber || booking.flightId,
-            duration: booking.flight?.duration
+            flightNumber: booking.flight?.flightNumber || booking.flightId
           }
         };
       });
