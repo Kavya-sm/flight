@@ -8,47 +8,59 @@
     
     <div class="bookings">
       <q-timeline color="secondary" class="q-pl-md">
-        <div class="booking" v-for="booking in normalizedBookings" :key="booking.id">
+        <div class="booking" v-for="booking in bookings" :key="booking.id">
           <q-timeline-entry class="booking__entry" icon="flight_takeoff" side="left">
             <h5 slot="subtitle" class="q-timeline-subtitle">
-              <span>
-                {{ booking.flight.departureAirportCode }} → {{ booking.flight.arrivalAirportCode }} &mdash;
-                {{ formatDate(booking.flight.departureDate) }}
+              <span v-if="booking.outboundFlight && booking.outboundFlight.departureAirportCode && booking.outboundFlight.arrivalAirportCode">
+                {{ booking.outboundFlight.departureAirportCode }} → {{ booking.outboundFlight.arrivalAirportCode }} &mdash;
+                {{ formatDate(booking.outboundFlight.departureDate) }}
+              </span>
+              <span v-else>
+                Flight Details
               </span>
             </h5>
             
-            <!-- Simple flight details display -->
+            <!-- Debug info -->
+            <div v-if="!booking.outboundFlight?.departureAirportCode" class="q-pa-sm bg-warning text-caption">
+              ⚠️ Missing flight data - check Vuex transformation
+            </div>
+            
             <div class="booking-details q-pa-md">
               <div class="row items-center">
                 <div class="col-6 text-center">
-                  <div class="text-h4 text-primary">{{ booking.flight.departureAirportCode }}</div>
-                  <div class="text-caption">Delhi (DEL)</div>
-                  <div class="text-caption text-weight-medium">{{ formatTime(booking.flight.departureDate) }}</div>
+                  <div class="text-h4 text-primary">{{ booking.outboundFlight?.departureAirportCode || '---' }}</div>
+                  <div class="text-caption">{{ getAirportName(booking.outboundFlight?.departureAirportCode) }}</div>
+                  <div class="text-caption text-weight-medium">{{ formatTime(booking.outboundFlight?.departureDate) }}</div>
                 </div>
                 <div class="col-6 text-center">
-                  <div class="text-h4 text-primary">{{ booking.flight.arrivalAirportCode }}</div>
-                  <div class="text-caption">Mumbai (BOM)</div>
-                  <div class="text-caption text-weight-medium">{{ formatTime(booking.flight.arrivalDate) }}</div>
+                  <div class="text-h4 text-primary">{{ booking.outboundFlight?.arrivalAirportCode || '---' }}</div>
+                  <div class="text-caption">{{ getAirportName(booking.outboundFlight?.arrivalAirportCode) }}</div>
+                  <div class="text-caption text-weight-medium">{{ formatTime(booking.outboundFlight?.arrivalDate) }}</div>
                 </div>
               </div>
               <div class="row justify-center q-mt-sm">
                 <div class="text-caption text-grey">
-                  Flight {{ booking.flight.flightNumber }} • {{ booking.flight.duration || '2h 30m' }}
+                  {{ booking.outboundFlight?.airline || 'Airline' }} {{ booking.outboundFlight?.flightNumber || '---' }} • {{ formatDuration(booking.outboundFlight?.duration) }}
                 </div>
               </div>
               <div class="row justify-center q-mt-sm">
                 <div class="text-caption text-grey">
-                  Booking Ref: {{ booking.bookingID }}
+                  Booking Ref: {{ booking.bookingReference }}
                 </div>
               </div>
               <div class="row justify-center q-mt-sm">
                 <div class="text-caption text-weight-medium text-primary">
-                  Total: ${{ booking.flight.price || booking.totalPrice || '75' }}
+                  Total: €{{ booking.totalPrice }}
+                </div>
+              </div>
+              <div class="row justify-center q-mt-sm">
+                <div class="text-caption text-grey">
+                  Passengers: {{ booking.passengers ? booking.passengers.length : 1 }}
                 </div>
               </div>
               <div class="row justify-center q-mt-sm">
                 <q-badge :color="getStatusColor(booking.status)" class="q-px-sm q-py-xs">
-                  {{ booking.status || 'confirmed' }}
+                  {{ booking.status }}
                 </q-badge>
               </div>
             </div>
@@ -56,7 +68,7 @@
         </div>
       </q-timeline>
       
-      <div v-if="normalizedBookings.length === 0" class="wrapper text-center q-mt-lg">
+      <div v-if="bookings.length === 0" class="wrapper text-center q-mt-lg">
         <q-icon name="flight" size="4rem" color="grey-5" />
         <div class="q-title q-mt-md text-grey-6">No bookings yet</div>
         <div class="q-subtitle text-grey-6">Book your first flight to see it here!</div>
@@ -70,7 +82,6 @@ import { mapState, mapGetters } from "vuex";
 
 export default {
   name: "Bookings",
-  components: { },
   
   mounted() {
     if (this.isAuthenticated) {
@@ -119,6 +130,17 @@ export default {
       }
     },
 
+    formatDuration(durationMinutes) {
+      if (!durationMinutes) return '--h --m';
+      if (typeof durationMinutes === 'string') return durationMinutes;
+      if (typeof durationMinutes === 'number') {
+        const hours = Math.floor(durationMinutes / 60);
+        const minutes = durationMinutes % 60;
+        return `${hours}h ${minutes}m`;
+      }
+      return '--h --m';
+    },
+
     getStatusColor(status) {
       const statusColors = {
         'confirmed': 'positive',
@@ -127,6 +149,20 @@ export default {
         'completed': 'info'
       };
       return statusColors[status] || 'grey';
+    },
+
+    getAirportName(code) {
+      if (!code) return 'Airport';
+      const airports = {
+        'DEL': 'Delhi',
+        'BOM': 'Mumbai', 
+        'BLR': 'Bangalore',
+        'MAA': 'Chennai',
+        'HYD': 'Hyderabad',
+        'CCU': 'Kolkata',
+        'AMD': 'Ahmedabad'
+      };
+      return airports[code] || `${code} Airport`;
     }
   },
   
@@ -134,35 +170,7 @@ export default {
     ...mapState({
       bookings: state => state.bookings.bookings
     }),
-    ...mapGetters("profile", ["isAuthenticated"]),
-    
-    normalizedBookings() {
-      if (!this.bookings || !Array.isArray(this.bookings)) {
-        return [];
-      }
-
-      return this.bookings.map(booking => {
-        // The flight data is in outboundFlight according to the API response
-        const flightData = booking.outboundFlight || {};
-        
-        return {
-          id: booking.id,
-          bookingID: booking.bookingReference || booking.id,
-          status: booking.status,
-          totalPrice: booking.totalPrice,
-          flight: {
-            // Direct from outboundFlight object
-            departureAirportCode: flightData.departureAirportCode || 'DEL',
-            arrivalAirportCode: flightData.arrivalAirportCode || 'BOM',
-            departureDate: flightData.departureDate || '2025-11-12T08:00:00',
-            arrivalDate: flightData.arrivalDate || '2025-11-12T10:30:00',
-            flightNumber: flightData.flightNumber || 'AI101',
-            price: flightData.price || booking.totalPrice,
-            duration: flightData.duration || '2h 30m'
-          }
-        };
-      });
-    }
+    ...mapGetters("profile", ["isAuthenticated"])
   }
 };
 </script>
@@ -182,10 +190,6 @@ export default {
   border-radius: 8px
   margin-top: 8px
   border: 1px solid $grey-3
-
-.booking__subtitle
-  font-weight: 500
-  margin-bottom: 8px
 
 .wrapper
   padding 0 1rem
