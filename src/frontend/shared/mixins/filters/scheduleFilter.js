@@ -13,46 +13,66 @@
  * // return flights arriving at 11am or later
  * const arrival = "2019-04-04T11:00+0000"
  * const filteredFlights = filterBySchedule(flights, { arrival })
- * @todo - Create a function that takes THIS as an extra arg and calc dates: https://stackoverflow.com/questions/7759237/how-do-i-pass-an-extra-parameter-to-the-callback-function-in-javascript-filter
  */
 export const scheduleFilter = {
   methods: {
     filterBySchedule(flights, { departure, arrival }) {
       if (!departure && !arrival) return flights;
 
+      console.log("=== SCHEDULE FILTER DEBUG ===");
+      console.log("Departure filter:", departure);
+      console.log("Arrival filter:", arrival);
+
+      let filtered = [...flights];
+
       if (departure) {
-        flights = flights.filter(function(flight) {
-          let flightDatetime = new Date(flight.departureDate);
-          let desiredDeparture = new Date(
-            flightDatetime.getFullYear(),
-            flightDatetime.getMonth(),
-            flightDatetime.getDate(),
-            departure.getHours(),
-            departure.getMinutes()
-          );
-          let flightSchedule = flightDatetime.getTime();
-          let desiredSchedule = desiredDeparture.getTime();
-          return flightSchedule >= desiredSchedule;
+        // Ensure departure is a proper Date object
+        const departureFilter = new Date(departure);
+        console.log("Departure filter time:", departureFilter.toISOString());
+
+        filtered = filtered.filter(flight => {
+          // Convert flight departure to Date object
+          const flightDepartureStr = flight.departureDate || flight.departure;
+          const flightDeparture = new Date(flightDepartureStr);
+          
+          if (isNaN(flightDeparture.getTime())) {
+            console.warn("Invalid flight departure date:", flightDepartureStr);
+            return true;
+          }
+
+          console.log("Flight departure:", flightDeparture.toISOString());
+          const passesFilter = flightDeparture >= departureFilter;
+          console.log("Passes departure filter:", passesFilter);
+          
+          return passesFilter;
         });
       }
 
       if (arrival) {
-        flights = flights.filter(function(flight) {
-          let flightDatetime = new Date(flight.arrivalDate);
-          let desiredArrival = new Date(
-            flightDatetime.getFullYear(),
-            flightDatetime.getMonth(),
-            flightDatetime.getDate(),
-            arrival.getHours(),
-            arrival.getMinutes()
-          );
-          let flightSchedule = flightDatetime.getTime();
-          let desiredSchedule = desiredArrival.getTime();
-          return flightSchedule <= desiredSchedule;
+        // Ensure arrival is a proper Date object
+        const arrivalFilter = new Date(arrival);
+        console.log("Arrival filter time:", arrivalFilter.toISOString());
+
+        filtered = filtered.filter(flight => {
+          // Convert flight arrival to Date object
+          const flightArrivalStr = flight.arrivalDate || flight.arrival;
+          const flightArrival = new Date(flightArrivalStr);
+          
+          if (isNaN(flightArrival.getTime())) {
+            console.warn("Invalid flight arrival date:", flightArrivalStr);
+            return true;
+          }
+
+          console.log("Flight arrival:", flightArrival.toISOString());
+          const passesFilter = flightArrival <= arrivalFilter;
+          console.log("Passes arrival filter:", passesFilter);
+          
+          return passesFilter;
         });
       }
 
-      return flights;
+      console.log("Final filtered count:", filtered.length);
+      return filtered;
     }
   }
 };
