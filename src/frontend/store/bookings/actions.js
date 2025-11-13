@@ -12,7 +12,7 @@ export async function createBooking({ commit, rootState }, { outboundFlight, pas
     const actualUserId = userId || user?.id || user?.sub || user?.username;
     
     console.log("User from profile:", user);
-    console.log("Extracted user ID:", actualUserId);
+    console.log("Extracted user ID:", actualUserId):
 
     if (!actualUserId) {
       throw new Error("User not authenticated");
