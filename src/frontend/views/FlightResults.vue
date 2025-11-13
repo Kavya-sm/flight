@@ -30,7 +30,11 @@
           </q-popup-edit>
         </q-fab-action>
         <q-fab-action color="secondary" icon="schedule" glossy>
-          <q-popup-edit title="Schedule filter" buttons v-model="timeFilterModel">
+          <q-popup-edit
+            title="Schedule filter"
+            buttons
+            v-model="timeFilterModel"
+          >
             <div class="time-filters q-pa-md">
               <div class="text-subtitle1 q-mb-md">Departure Time</div>
               <q-datetime
@@ -68,9 +72,9 @@
           <flight-loader></flight-loader>
         </div>
         <div v-if="filteredFlights.length && !loading">
-          <span class="results__headline" data-test="results-headline"
-            >Select your flight ({{ filteredFlights.length }} found from {{ departure }} to {{ arrival }})</span
-          >
+          <span class="results__headline" data-test="results-headline">
+            Select your flight ({{ filteredFlights.length }} found from {{ departure }} to {{ arrival }})
+          </span>
         </div>
         <div
           v-if="!filteredFlights.length && !loading"
@@ -79,8 +83,9 @@
           <span
             class="justify-center full-width results__error"
             data-test="results-error"
-            >No flights found from {{ departure }} to {{ arrival }}</span
           >
+            No flights found from {{ departure }} to {{ arrival }}
+          </span>
           <transition enter-active-class="animated bounce" appear>
             <q-btn
               class="cta__button heading__error--cta"
@@ -88,8 +93,7 @@
               label="Search flights"
               icon="keyboard_arrow_left"
               :to="{ name: 'home' }"
-            >
-            </q-btn>
+            />
           </transition>
         </div>
       </div>
@@ -149,7 +153,7 @@ export default {
       departureTimeFilter: null,
       arrivalTimeFilter: null,
       maxPriceFilter: 300,
-      timeFilterModel: "time" // Dummy model for popup
+      timeFilterModel: "time"
     };
   },
   mounted() {
@@ -158,15 +162,13 @@ export default {
     }
   },
   watch: {
-    // Watch for time filter changes and apply filters automatically
-    departureTimeFilter(newVal) {
+    departureTimeFilter() {
       this.applyTimeFilters();
     },
-    arrivalTimeFilter(newVal) {
+    arrivalTimeFilter() {
       this.applyTimeFilters();
     },
-    // Reload flights when route parameters change
-    '$route.query': {
+    "$route.query": {
       handler(newQuery) {
         if (this.isAuthenticated && newQuery.departure && newQuery.arrival) {
           this.loadFlights();
@@ -192,7 +194,6 @@ export default {
             paginationToken: this.paginationToken
           });
 
-          // Apply any existing filters when loading new flights
           this.applyAllFilters();
         }
       } catch (error) {
@@ -202,31 +203,18 @@ export default {
         );
       }
     },
-
     applyAllFilters() {
       let flights = this.uniqueFlights;
-      
-      // Apply price filter
       flights = this.filterByMaxPrice(flights, this.maxPriceFilter);
-      
-      // Apply time filters
       flights = this.applyTimeFiltersToFlights(flights);
-      
       this.filteredFlights = this.sortByDeparture(flights);
     },
-
     applyTimeFilters() {
       let flights = this.uniqueFlights;
-      
-      // Apply price filter first
       flights = this.filterByMaxPrice(flights, this.maxPriceFilter);
-      
-      // Apply time filters
       flights = this.applyTimeFiltersToFlights(flights);
-      
       this.filteredFlights = this.sortByDeparture(flights);
     },
-
     applyTimeFiltersToFlights(flights) {
       if (this.departureTimeFilter || this.arrivalTimeFilter) {
         return this.filterBySchedule(flights, {
@@ -236,11 +224,9 @@ export default {
       }
       return flights;
     },
-
     setPrice() {
       this.applyAllFilters();
     },
-
     resetFilters() {
       this.departureTimeFilter = null;
       this.arrivalTimeFilter = null;
@@ -255,18 +241,16 @@ export default {
       paginationToken: state => state.catalog.paginationToken
     }),
     ...mapGetters("profile", ["isAuthenticated"]),
-    
     uniqueFlights() {
-      return this.flights.filter((flight, index, self) => 
+      return this.flights.filter((flight, index, self) =>
         index === self.findIndex(f => f.id === flight.id)
       );
     },
-    
-    maximumPrice: function() {
+    maximumPrice() {
       const prices = this.uniqueFlights.map(filter => filter.ticketPrice);
       return prices.length > 0 ? Math.max(...prices) : 500;
     },
-    minimumPrice: function() {
+    minimumPrice() {
       const prices = this.uniqueFlights.map(filter => filter.ticketPrice);
       return prices.length > 0 ? Math.min(...prices) : 1;
     }
@@ -290,7 +274,7 @@ export default {
 
 .time-filters
   min-width: 300px
-  
+
 .filter__departure,
 .filter__arrival
   width: 100%
