@@ -98,6 +98,32 @@ export default {
     },
   },
 };
+
+// --- HACK: Intercept fetch to fix body key 'message' → 'text' for Lex Lambda ---
+const originalFetch = window.fetch;
+window.fetch = async (...args) => {
+  if (
+    args[0] ===
+    "https://sywyfyg7aj.execute-api.ap-south-1.amazonaws.com/1_aerochat_prod/chat"
+  ) {
+    try {
+      let options = args[1] || {};
+      if (options.body) {
+        let bodyObj = JSON.parse(options.body);
+        // Rename 'message' to 'text'
+        if (bodyObj.message) {
+          bodyObj.text = bodyObj.message;
+          delete bodyObj.message;
+          options.body = JSON.stringify(bodyObj);
+        }
+      }
+      args[1] = options;
+    } catch (e) {
+      console.warn("Fetch body hack failed:", e);
+    }
+  }
+  return originalFetch(...args);
+};
 </script>
 
 <style scoped>
@@ -191,3 +217,4 @@ export default {
   cursor: pointer;
 }
 </style>
+
