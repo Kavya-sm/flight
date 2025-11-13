@@ -1,11 +1,11 @@
 <template>
   <div class="chatbot-container">
     <div v-if="!isOpen" class="chatbot-button" @click="isOpen = true">
-      <q-icon name="support_agent" size="28px" />
+      <q-icon name="flight" size="28px" />
     </div>
     <div v-else class="chatbot-window">
       <div class="chatbot-header">
-        <span>Travel Assistant</span>
+        <span>Flight Booking Assistant</span>
         <button class="close-btn" @click="isOpen = false">×</button>
       </div>
       <div class="chatbot-messages" ref="messagesContainer">
@@ -18,7 +18,7 @@
         <input
           v-model="userInput"
           @keyup.enter="sendMessage"
-          placeholder="Ask about flights, bookings, or travel..."
+          placeholder="Ask about flight booking or travel tips..."
           :disabled="isLoading"
         />
         <button @click="sendMessage" :disabled="isLoading">
@@ -31,13 +31,13 @@
 
 <script>
 export default {
-  name: "TravelAssistant",
+  name: "FlightBookingAssistant",
   data() {
     return {
       isOpen: false,
       userInput: "",
       messages: [
-        { text: "👋 Hello! I'm your Travel Assistant. I can help you with:\n\n• Flight information ✈️\n• Booking assistance\n• Travel tips\n• Airport guides\n• Baggage queries\n\nHow can I help you today?", sender: "bot" }
+        { text: "✈️ Welcome to Flight Booking Assistant!\n\nI can help you with:\n• Flight booking guidance\n• Travel tips\n• Baggage allowance information\n• Loyalty points & discounts\n\nHow can I assist with your flight today?", sender: "bot" }
       ],
       isLoading: false,
     };
@@ -60,7 +60,6 @@ export default {
       this.scrollToBottom();
 
       try {
-        // Try to get response from your API
         const response = await this.callAssistantAPI(text);
         if (response && response.ok) {
           const data = await response.json();
@@ -70,7 +69,6 @@ export default {
           throw new Error('API unavailable');
         }
       } catch (error) {
-        // Use smart assistant replies
         const assistantReply = this.generateAssistantReply(text);
         this.messages.push({ text: assistantReply, sender: "bot" });
       } finally {
@@ -80,7 +78,6 @@ export default {
     },
 
     async callAssistantAPI(text) {
-      // Your existing API call
       try {
         return await fetch(
           "https://sywyfyg7aj.execute-api.ap-south-1.amazonaws.com/1_aerochat_prod/lex/aerochat",
@@ -107,69 +104,62 @@ export default {
       if (data.reply) {
         return data.reply;
       }
-      return this.generateAssistantReply("general help");
+      return this.generateAssistantReply("help");
     },
 
     generateAssistantReply(userMessage) {
       const lowerMessage = userMessage.toLowerCase();
       
-      // Booking assistance
-      if (lowerMessage.includes('book') || lowerMessage.includes('reserve') || lowerMessage.includes('reservation')) {
-        return `📖 **Booking Assistance**\n\nTo book a flight, please:\n\n1. Visit our "Book Flights" section\n2. Select your departure & destination cities\n3. Choose travel dates\n4. Select number of passengers\n5. Choose your preferred flight\n6. Complete payment\n\nNeed help with any specific step?`;
+      // End conversation
+      if (lowerMessage.includes('bye') || lowerMessage.includes('goodbye') || 
+          lowerMessage.includes('see you') || lowerMessage.includes('thanks bye')) {
+        return `👋 Thank you for chatting with Flight Booking Assistant! \n\nSafe travels and have a wonderful journey! ✈️\n\nFeel free to ask if you need more help later.`;
       }
-      
-      // Flight information
-      if (lowerMessage.includes('flight') && (lowerMessage.includes('status') || lowerMessage.includes('track'))) {
-        return `✈️ **Flight Status**\n\nTo check your flight status:\n\n• Visit "Flight Status" page\n• Enter your flight number\n• Or check by route and date\n\nYou can also check your booking confirmation email for real-time updates.`;
+
+      // Flight booking guidance
+      if (lowerMessage.includes('book') || lowerMessage.includes('how to book') ||
+          lowerMessage.includes('want to book') || lowerMessage.includes('need to book') ||
+          lowerMessage.includes('flight booking') || lowerMessage.includes('book flight')) {
+        return `📖 **How to Book a Flight:**\n\nTo book a flight, please:\n\n1. Visit our "Book Flights" section\n2. Select your departure & destination cities\n3. Choose travel dates\n4. Choose your preferred flight\n5. Complete payment\n\nThat's it! You'll receive your booking confirmation instantly.`;
       }
-      
-      // Check-in
-      if (lowerMessage.includes('check') && lowerMessage.includes('in')) {
-        return `🎫 **Online Check-in**\n\nOnline check-in opens 48 hours before departure:\n\n1. Go to "Manage Booking"\n2. Enter your booking reference\n3. Select passengers to check-in\n4. Choose seats\n5. Download boarding pass\n\nMobile boarding passes are available!`;
+
+      // Loyalty points and discounts
+      if (lowerMessage.includes('loyalty') || lowerMessage.includes('points') || 
+          lowerMessage.includes('reward') || lowerMessage.includes('discount') ||
+          lowerMessage.includes('membership') || lowerMessage.includes('benefits')) {
+        return `🏆 **Loyalty Points & Discounts**\n\n**Earn Points:**\n• Get 100 points for every flight booked\n• Extra 50 points for international flights\n• Bonus points on premium class bookings\n\n**Redeem Points:**\n• Use points for flight discounts\n• 100 points = $10 discount\n• Redeem for seat upgrades\n• Get priority boarding\n\n**Benefits:**\n• Exclusive member-only deals\n• Faster check-in process\n• Free baggage allowance increase\n• Access to airport lounges\n\nCheck your points balance in "My Account" section!`;
       }
-      
-      // Baggage
-      if (lowerMessage.includes('baggage') || lowerMessage.includes('luggage') || lowerMessage.includes('bag')) {
-        return `🎒 **Baggage Information**\n\n**Carry-on:** 1 bag + 1 personal item (7kg total)\n**Check-in:** 15-30kg depending on fare class\n\n• Extra baggage can be purchased online\n• Sports equipment requires advance notice\n• Prohibited items list available on our website`;
+
+      // Baggage allowance
+      if (lowerMessage.includes('baggage') || lowerMessage.includes('luggage') || 
+          lowerMessage.includes('bag') || lowerMessage.includes('allowance')) {
+        return `🎒 **Baggage Allowance**\n\n**Carry-on Baggage:**\n• 1 cabin bag (7kg maximum)\n• 1 personal item (laptop bag/handbag)\n\n**Check-in Baggage:**\n• Economy: 15kg\n• Premium Economy: 20kg\n• Business Class: 30kg\n\n💡 **Loyalty members get extra 5kg baggage allowance!**`;
       }
-      
-      // Airport information
-      if (lowerMessage.includes('airport') || lowerMessage.includes('terminal')) {
-        return `🏢 **Airport Guide**\n\n**General Tips:**\n• Arrive 2 hours before domestic flights\n• Arrive 3 hours before international flights\n• Have ID and booking reference ready\n• Check security guidelines before packing`;
+
+      // Travel tips
+      if (lowerMessage.includes('tip') || lowerMessage.includes('advice') || 
+          lowerMessage.includes('suggestion') || lowerMessage.includes('recommend')) {
+        return `💡 **Travel Tips**\n\n**Before Flight:**\n• Check-in online 48 hours before\n• Arrive 2 hours before domestic flights\n• Keep ID and booking reference ready\n\n**At Airport:**\n• Have liquids in clear bags\n• Wear comfortable shoes\n• Charge your devices\n\n**Loyalty Benefits:**\n• Use points for discounts on next booking\n• Book flights on weekdays for better prices\n• Download our mobile app for exclusive deals`;
       }
-      
-      // Travel requirements
-      if (lowerMessage.includes('visa') || lowerMessage.includes('passport') || lowerMessage.includes('document')) {
-        return `📄 **Travel Documents**\n\n**Domestic:** Government photo ID\n**International:** Valid passport + visa if required\n\n• Check visa requirements for your destination\n• Ensure passport validity (6+ months)\n• Keep digital copies of documents`;
-      }
-      
-      // Payment and pricing
-      if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('payment')) {
-        return `💰 **Pricing & Payment**\n\n• Prices vary by route, date, and demand\n• Multiple payment methods accepted\n• Price includes base fare + taxes\n• Seat selection may have additional cost\n\nCheck our website for current deals!`;
-      }
-      
-      // Cancellation and changes
-      if (lowerMessage.includes('cancel') || lowerMessage.includes('change') || lowerMessage.includes('modify')) {
-        return `🔄 **Changes & Cancellations**\n\n**Manage your booking online:**\n• Change flight dates/times\n• Cancel with refund (if eligible)\n• Add extra services\n• Update passenger details\n\nFees may apply based on fare rules.`;
-      }
-      
+
       // Greetings
-      if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('hey')) {
-        return `👋 Hello! I'm your Travel Assistant!\n\nI can help you with:\n• ✈️ Flight information\n• 📖 Booking guidance\n• 🎒 Baggage queries\n• 🏢 Airport tips\n• 📄 Travel documents\n• 💰 Pricing questions\n\nWhat would you like to know?`;
+      if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || 
+          lowerMessage.includes('hey') || lowerMessage === 'hey') {
+        return `👋 Hello! I'm your Flight Booking Assistant.\n\nI specialize in:\n• ✈️ Flight booking guidance\n• 💡 Travel tips\n• 🎒 Baggage information\n• 🏆 Loyalty points & discounts\n\nHow can I help you with your flight today?`;
       }
-      
+
       // Thanks
-      if (lowerMessage.includes('thank')) {
-        return `😊 You're welcome! I'm happy to help.\n\nIs there anything else about your travel plans you'd like to know?`;
+      if (lowerMessage.includes('thank') || lowerMessage.includes('thanks')) {
+        return `😊 You're welcome! I'm happy to help with your flight planning.\n\nIs there anything else about flight booking or loyalty points you'd like to know?`;
       }
-      
+
       // Help
       if (lowerMessage.includes('help')) {
-        return `🆘 **How I Can Help You:**\n\n✈️ **Flight Assistance**\n• Booking guidance\n• Flight status\n• Check-in help\n• Baggage information\n\n📋 **Travel Planning**\n• Airport information\n• Document requirements\n• Travel tips\n• Payment questions\n\n💼 **Booking Management**\n• Changes & cancellations\n• Seat selection\n• Extra services\n• Refund information\n\nWhat specific area do you need help with?`;
+        return `🆘 **I Can Help With:**\n\n✈️ **Flight Booking**\n• How to book flights step-by-step\n• Flight selection guidance\n\n🏆 **Loyalty Program**\n• Earning and redeeming points\n• Member benefits and discounts\n\n💡 **Travel Assistance**\n• Baggage allowance information\n• Airport and travel tips\n\nWhat specific help do you need?`;
       }
-      
-      // Default response
-      return `🤔 I understand you're asking about: "${userMessage}"\n\nAs your Travel Assistant, I can help with:\n\n• Flight booking guidance ✈️\n• Travel information and tips\n• Airport and baggage queries\n• Booking management help\n• General travel advice\n\nCould you tell me more specifically what you need help with?`;
+
+      // Default
+      return `✈️ I understand you're asking about flight travel.\n\nI can help you with:\n• How to book flights step-by-step\n• Loyalty points and discount information\n• Baggage allowance details\n• Travel tips and preparation\n\nWould you like guidance on booking a flight or information about loyalty points?`;
     }
   },
   watch: {
@@ -256,21 +246,6 @@ export default {
   padding: 20px;
   overflow-y: auto;
   background: #fafbfc;
-  scrollbar-width: thin;
-  scrollbar-color: #c1c1c1 transparent;
-}
-
-.chatbot-messages::-webkit-scrollbar {
-  width: 6px;
-}
-
-.chatbot-messages::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.chatbot-messages::-webkit-scrollbar-thumb {
-  background-color: #c1c1c1;
-  border-radius: 3px;
 }
 
 .message {
@@ -368,6 +343,7 @@ export default {
   box-shadow: none;
 }
 </style>
+
 
 
 
