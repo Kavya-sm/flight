@@ -1,14 +1,15 @@
 import Loyalty from "../../shared/models/LoyaltyClass";
 import { Loading } from "quasar";
 
-const LOYALTY_API_URL = "https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod";
+const LOYALTY_API_URL =
+  "https://uqeubfps3l.execute-api.ap-south-1.amazonaws.com/prod";
 
 /**
  * Fetch loyalty data for current user
  */
 export async function fetchLoyalty({ commit, rootState }) {
   Loading.show({
-    message: "Loading loyalty data..."
+    message: "Loading loyalty data...",
   });
 
   try {
@@ -26,22 +27,27 @@ export async function fetchLoyalty({ commit, rootState }) {
     }
 
     // Use fetch with userId parameter
-    const response = await fetch(`${LOYALTY_API_URL}/loyalty?userId=${encodeURIComponent(userId)}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
+    const response = await fetch(
+      `${LOYALTY_API_URL}/loyalty?userId=${encodeURIComponent(userId)}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
       }
-    });
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Loyalty API error response:", errorText);
-      throw new Error(`Failed to fetch loyalty info: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Failed to fetch loyalty info: ${response.status} ${response.statusText}`
+      );
     }
 
     const loyaltyData = await response.json();
     console.log("Loyalty data:", loyaltyData);
-    
+
     const loyalty = new Loyalty(loyaltyData);
     commit("SET_LOYALTY", loyalty);
 
@@ -69,19 +75,24 @@ export async function addLoyaltyPoints({ commit, rootState }, points) {
       throw new Error("User not authenticated - no user ID found");
     }
 
-    const response = await fetch(`${LOYALTY_API_URL}/loyalty?userId=${encodeURIComponent(userId)}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        pointsToAdd: points
-      })
-    });
+    const response = await fetch(
+      `${LOYALTY_API_URL}/loyalty?userId=${encodeURIComponent(userId)}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          pointsToAdd: points,
+        }),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to add points: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Failed to add points: ${response.status} ${response.statusText}`
+      );
     }
 
     const loyaltyData = await response.json();
